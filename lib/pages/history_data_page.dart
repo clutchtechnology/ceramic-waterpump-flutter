@@ -19,8 +19,8 @@ class HistoryDataPage extends StatefulWidget {
 }
 
 /// 暴露给外部调用的刷新方法
-class HistoryDataPageState extends State<HistoryDataPage>
-    with AutomaticKeepAliveClientMixin, RouteAware {
+/// 注意：移除 AutomaticKeepAliveClientMixin 避免内存泄漏
+class HistoryDataPageState extends State<HistoryDataPage> {
   bool _isLoading = false;
   bool _isInitialized = false;
 
@@ -89,9 +89,6 @@ class HistoryDataPageState extends State<HistoryDataPage>
   final List<Color> _pressureColors = [TechColors.glowCyan];
 
   @override
-  bool get wantKeepAlive => true;
-
-  @override
   void initState() {
     super.initState();
     _initializeTimeRanges();
@@ -100,8 +97,12 @@ class HistoryDataPageState extends State<HistoryDataPage>
   }
 
   @override
+  @override
   void dispose() {
+    // 1, 取消防抖定时器
     _debounceTimer?.cancel();
+    _debounceTimer = null;
+    // 2, HistoryService 使用 ApiClient 单例，无需主动释放
     super.dispose();
   }
 
@@ -182,11 +183,6 @@ class HistoryDataPageState extends State<HistoryDataPage>
         });
       }
     }
-  }
-
-  /// 保留旧方法名兼容
-  Future<void> _refreshAllCharts() async {
-    await _doRefreshAllCharts();
   }
 
   /// 加载阈值配置 (从Provider同步)
@@ -332,8 +328,6 @@ class HistoryDataPageState extends State<HistoryDataPage>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
-
     if (_isLoading) {
       return Container(
         color: TechColors.bgDeep,
@@ -608,46 +602,6 @@ class HistoryDataPageState extends State<HistoryDataPage>
     );
   }
 
-  // ==================== 报警阈值设置对话框 ====================
-
-  void _showVibrationAlarmDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => _AlarmSettingsDialog(
-        title: '振动报警设置',
-        accentColor: TechColors.glowOrange,
-        highValue: _vibrationHighAlarm,
-        highLabel: '高幅度报警 (mm/s)',
-        onSave: (high, _) {
-          setState(() {
-            _vibrationHighAlarm = high;
-          });
-        },
-      ),
-    );
-  }
-
-  void _showPressureAlarmDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => _AlarmSettingsDialog(
-        title: '压力报警设置',
-        accentColor: TechColors.glowCyan,
-        highValue: _pressureHighAlarm,
-        lowValue: _pressureLowAlarm,
-        highLabel: '高压报警 (MPa)',
-        lowLabel: '低压报警 (MPa)',
-        showLow: true,
-        onSave: (high, low) {
-          setState(() {
-            _pressureHighAlarm = high;
-            if (low != null) _pressureLowAlarm = low;
-          });
-        },
-      ),
-    );
-  }
-
   // ==================== 时间选择方法 ====================
 
   Future<void> _selectChartStartTime(String chartType) async {
@@ -664,13 +618,14 @@ class HistoryDataPageState extends State<HistoryDataPage>
     );
 
     if (pickedDate != null) {
+      if (!mounted) return;
       final TimeOfDay? pickedTime = await showTimePicker(
         context: context,
         initialTime: TimeOfDay.fromDateTime(startTime),
         builder: (context, child) => _buildTimePickerTheme(child, accentColor),
       );
 
-      if (pickedTime != null) {
+      if (pickedTime != null && mounted) {
         setState(() {
           final newStart = DateTime(
             pickedDate.year,
@@ -700,13 +655,14 @@ class HistoryDataPageState extends State<HistoryDataPage>
     );
 
     if (pickedDate != null) {
+      if (!mounted) return;
       final TimeOfDay? pickedTime = await showTimePicker(
         context: context,
         initialTime: TimeOfDay.fromDateTime(endTime),
         builder: (context, child) => _buildTimePickerTheme(child, accentColor),
       );
 
-      if (pickedTime != null) {
+      if (pickedTime != null && mounted) {
         setState(() {
           final newEnd = DateTime(
             pickedDate.year,
@@ -847,14 +803,16 @@ class HistoryDataPageState extends State<HistoryDataPage>
 }
 
 /// 报警阈值设置对话框
+/// 注意: lowValue/lowLabel/showLow 参数为扩展预留，当前未使用
+// ignore_for_file: unused_element
 class _AlarmSettingsDialog extends StatefulWidget {
   final String title;
   final Color accentColor;
   final double highValue;
-  final double? lowValue;
+  final double? lowValue; // 预留: 低阈值
   final String highLabel;
-  final String? lowLabel;
-  final bool showLow;
+  final String? lowLabel; // 预留: 低阈值标签
+  final bool showLow; // 预留: 是否显示低阈值
   final void Function(double high, double? low) onSave;
 
   const _AlarmSettingsDialog({
@@ -931,7 +889,8 @@ class _AlarmSettingsDialogState extends State<_AlarmSettingsDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text('取消', style: TextStyle(color: TechColors.textSecondary)),
+          child: Text('取消',
+              style: const TextStyle(color: TechColors.textSecondary)),
         ),
         ElevatedButton(
           onPressed: () {
@@ -975,11 +934,11 @@ class _AlarmSettingsDialogState extends State<_AlarmSettingsDialog> {
             fillColor: TechColors.bgMedium,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(4),
-              borderSide: BorderSide(color: TechColors.borderDark),
+              borderSide: const BorderSide(color: TechColors.borderDark),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(4),
-              borderSide: BorderSide(color: TechColors.borderDark),
+              borderSide: const BorderSide(color: TechColors.borderDark),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(4),

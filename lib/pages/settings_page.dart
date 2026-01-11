@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 import '../widgets/tech_line_widgets.dart';
@@ -11,7 +10,7 @@ import '../providers/threshold_config_provider.dart';
 /// 可修改操作员密码: water123 (默认)
 class SettingsPage extends StatefulWidget {
   final ThresholdConfigProvider? thresholdProvider;
-  
+
   const SettingsPage({super.key, this.thresholdProvider});
 
   @override

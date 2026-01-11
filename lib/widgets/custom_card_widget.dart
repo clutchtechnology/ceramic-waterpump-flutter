@@ -23,10 +23,10 @@ class CustomCardWidget extends StatelessWidget {
   final double? pressure; // 压力 MPa (仅1号水泵有)
 
   // 颜色参数 (根据阈值配置)
-  final Color? powerColor;     // 功率颜色
-  final Color? currentColor;   // 电流颜色
+  final Color? powerColor; // 功率颜色
+  final Color? currentColor; // 电流颜色
   final Color? vibrationColor; // 振动颜色
-  final Color? pressureColor;  // 压力颜色
+  final Color? pressureColor; // 压力颜色
 
   const CustomCardWidget({
     super.key,

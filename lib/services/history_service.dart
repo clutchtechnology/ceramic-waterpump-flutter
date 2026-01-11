@@ -1,4 +1,12 @@
+// 历史数据服务
+// ============================================================
+// 功能:
+//   - [HS-1] 动态计算最佳聚合间隔 (目标 50 个数据点)
+//   - [HS-2] 查询单个/多个水泵历史数据
+//   - [HS-3] 查询压力/功率历史数据
+// ============================================================
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import '../api/index.dart';
 
 /// 历史数据服务
@@ -174,7 +182,7 @@ class HistoryService {
         params['pump_id'] = pumpId.toString();
       }
 
-      print(
+      debugPrint(
           '[HistoryService] 查询参数: $parameter, 时间范围: ${end.difference(start).inMinutes}分钟, 聚合间隔: $effectiveInterval');
 
       final response = await _apiClient.get(Api.history, params: params);
@@ -191,7 +199,7 @@ class HistoryService {
           );
         }).toList();
 
-        print('[HistoryService] 获取到 ${points.length} 个数据点');
+        debugPrint('[HistoryService] 获取到 ${points.length} 个数据点');
 
         return HistoryDataResponse(
           success: true,
@@ -214,7 +222,7 @@ class HistoryService {
         interval: interval ?? calculateAggregateInterval(start, end),
       );
     } catch (e) {
-      print('[HistoryService] 获取历史数据失败: $e');
+      debugPrint('[HistoryService] 获取历史数据失败: $e');
       return HistoryDataResponse.empty(
         pumpId: pumpId,
         parameter: parameter,
@@ -304,6 +312,11 @@ class HistoryService {
       end: end,
       interval: interval,
     );
+  }
+
+  /// 释放资源 (预留接口，当前 ApiClient 为单例无需释放)
+  void dispose() {
+    // ApiClient 是单例，由应用退出时统一释放
   }
 }
 

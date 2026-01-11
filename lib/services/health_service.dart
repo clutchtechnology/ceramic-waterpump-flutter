@@ -1,3 +1,11 @@
+// 健康状态检查服务
+// ============================================================
+// 功能:
+//   - [H-1] 检查后端服务存活状态
+//   - [H-2] 检查 PLC 连接状态
+//   - [H-3] 检查数据库连接状态
+// ============================================================
+import 'package:flutter/foundation.dart';
 import '../api/index.dart';
 import '../models/pump_data.dart';
 
@@ -20,8 +28,8 @@ class HealthService {
         );
       }
     } catch (e) {
-      // 服务不可达
-      print('[HealthService] 健康检查失败: $e');
+      // [H-1] 服务不可达时记录日志
+      debugPrint('[HealthService] 健康检查失败: $e');
     }
 
     return HealthStatus(
@@ -39,7 +47,7 @@ class HealthService {
         return StatusResponse.fromJson(response);
       }
     } catch (e) {
-      print('[HealthService] 获取系统状态失败: $e');
+      debugPrint('[HealthService] 获取系统状态失败: $e');
     }
     return null;
   }

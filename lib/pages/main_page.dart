@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
+import '../api/api_client.dart';
 import '../widgets/tech_line_widgets.dart';
 import '../widgets/custom_card_widget.dart';
 import '../widgets/health_indicator.dart';
@@ -12,6 +13,7 @@ import '../providers/threshold_config_provider.dart';
 import 'history_data_page.dart';
 import 'settings_page.dart';
 import 'alarm_log_page.dart';
+import 'sensor_status_page.dart';
 
 /// 主页面 - 带Tab导航
 /// Tab1: 实时监控 (水泵卡片)
@@ -25,94 +27,175 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage>
     with SingleTickerProviderStateMixin {
+  // 1, Tab 控制器
   late TabController _tabController;
+
+  // 2, 服务单例 (避免重复创建)
   final HealthService _healthService = HealthService();
   final RealtimeService _realtimeService = RealtimeService();
 
-  // 阈值配置Provider
+  // 3, 阈值配置 Provider (共享给 SettingsPage)
   final ThresholdConfigProvider _thresholdProvider = ThresholdConfigProvider();
 
-  // HistoryDataPage 的 GlobalKey，用于调用刷新方法
+  // 4, HistoryDataPage 的 GlobalKey，用于调用刷新方法
   final GlobalKey<HistoryDataPageState> _historyPageKey = GlobalKey();
 
-  // 健康状态
+  // 5, SensorStatusPage 的 GlobalKey，用于控制轮询
+  final GlobalKey<SensorStatusPageState> _sensorStatusPageKey = GlobalKey();
+
+  // 6, 跟踪当前 Tab 索引 (用于控制轮询)
+  int _currentTabIndex = 0;
+
+  // 7, 时钟定时器
+  Timer? _clockTimer;
+  String _clockTime = '';
+
+  // 8, 健康状态
   bool _serverHealthy = false;
   bool _plcHealthy = false;
   bool _dbHealthy = false;
   bool _isHealthLoading = true;
   Timer? _healthCheckTimer;
 
-  // 实时数据
+  // 9, 实时数据
   RealtimeBatchResponse? _realtimeData;
-  String _dataSource = 'none'; // mock 或 plc
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(_onTabChanged); // 监听tab切换
-    _thresholdProvider.loadConfig(); // 加载阈值配置
-    _thresholdProvider.addListener(_onThresholdChanged); // 监听阈值变化
+    // 1, 初始化 Tab 控制器
+    _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(_onTabChanged);
+
+    // 3, 加载阈值配置并监听变化
+    _thresholdProvider.loadConfig();
+    _thresholdProvider.addListener(_onThresholdChanged);
+
+    // 8, 启动健康检查
     _startHealthCheck();
+
+    // 9, 启动实时数据轮询
     _startRealtimePolling();
+
+    // 7, 启动时钟定时器
+    _startClockTimer();
   }
 
-  /// 阈值配置变化回调
+  /// 3, 阈值配置变化回调 - 触发 UI 重建更新颜色
   void _onThresholdChanged() {
     if (mounted) {
-      setState(() {
-        // 触发UI重建，更新颜色
-      });
+      setState(() {});
     }
   }
 
-  /// Tab切换回调
+  /// 6, Tab 切换回调 - 控制各页面轮询
   void _onTabChanged() {
-    if (!_tabController.indexIsChanging && _tabController.index == 1) {
-      // 切换到历史数据页面时，触发刷新
+    if (_tabController.indexIsChanging) return;
+
+    final newIndex = _tabController.index;
+    final oldIndex = _currentTabIndex;
+    _currentTabIndex = newIndex;
+
+    // 5, 离开设备状态页时暂停轮询
+    if (oldIndex == 3) {
+      _sensorStatusPageKey.currentState?.pausePolling();
+    }
+
+    // 4, 进入历史数据页面时刷新
+    if (newIndex == 1) {
       _historyPageKey.currentState?.refreshData();
+    }
+    // 5, 进入设备状态页面时恢复轮询
+    else if (newIndex == 3) {
+      _sensorStatusPageKey.currentState?.resumePolling();
+    }
+  }
+
+  /// 7, 启动时钟定时器 (替代 StreamBuilder 避免无法取消的 Stream)
+  void _startClockTimer() {
+    _updateClockTime();
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return; // 7.1, 检查 mounted 状态
+      _updateClockTime();
+    });
+  }
+
+  /// 7, 更新时钟显示
+  void _updateClockTime() {
+    if (!mounted) return;
+    final now = DateTime.now();
+    final timeStr =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+    if (_clockTime != timeStr) {
+      setState(() {
+        _clockTime = timeStr;
+      });
     }
   }
 
   @override
   void dispose() {
+    // 1, 移除 Tab 监听器
     _tabController.removeListener(_onTabChanged);
-    _thresholdProvider.removeListener(_onThresholdChanged); // 移除阈值监听
+
+    // 3, 移除阈值监听器
+    _thresholdProvider.removeListener(_onThresholdChanged);
+
+    // 1, 释放 Tab 控制器
     _tabController.dispose();
+
+    // 8, 取消健康检查定时器
     _healthCheckTimer?.cancel();
+    _healthCheckTimer = null;
+
+    // 7, 取消时钟定时器
+    _clockTimer?.cancel();
+    _clockTimer = null;
+
+    // 2, 释放服务资源
     _healthService.dispose();
     _realtimeService.dispose();
+
+    // 清理 HTTP 客户端 (应用退出时)
+    ApiClient.dispose();
+
     super.dispose();
   }
 
-  /// 启动健康状态检查
+  /// 8, 启动健康状态检查 (每 10 秒)
   void _startHealthCheck() {
     _checkHealth();
     _healthCheckTimer = Timer.periodic(
       const Duration(seconds: 10),
-      (_) => _checkHealth(),
+      (_) {
+        if (!mounted) return; // 8.1, 检查 mounted 状态
+        _checkHealth();
+      },
     );
   }
 
-  /// 启动实时数据轮询 (每6秒)
+  /// 9, 启动实时数据轮询 (每 5 秒)
   void _startRealtimePolling() {
     _realtimeService.onDataUpdate = (data) {
       if (mounted) {
         setState(() {
           _realtimeData = data;
-          _dataSource = data.source;
         });
       }
     };
 
     _realtimeService.onError = (error) {
-      print('[MainPage] 实时数据错误: $error');
+      // 仅在调试模式打印错误，避免日志泛滥
+      assert(() {
+        debugPrint('[MainPage] 实时数据错误: $error');
+        return true;
+      }());
     };
 
     _realtimeService.startPolling(intervalSeconds: 5);
   }
 
-  /// 检查健康状态
+  /// 8, 检查健康状态
   Future<void> _checkHealth() async {
     if (!mounted) return;
 
@@ -148,6 +231,8 @@ class _MainPageState extends State<MainPage>
                 HistoryDataPage(key: _historyPageKey),
                 // Tab3: 系统设置 - 传入共享的阈值配置Provider
                 SettingsPage(thresholdProvider: _thresholdProvider),
+                // Tab4: 设备状态 - 使用GlobalKey控制轮询
+                SensorStatusPage(key: _sensorStatusPageKey),
               ],
             ),
           ),
@@ -216,9 +301,9 @@ class _MainPageState extends State<MainPage>
               dbLoading: _isHealthLoading,
               onRefresh: _checkHealth,
             ),
-            const SizedBox(width: 12),            // 报警日志按钮
+            const SizedBox(width: 12), // 报警日志按钮
             _buildAlarmButton(),
-            const SizedBox(width: 12),            // 时钟
+            const SizedBox(width: 12), // 时钟
             _buildClock(),
             const SizedBox(width: 12),
             // 窗口控制按钮
@@ -240,6 +325,8 @@ class _MainPageState extends State<MainPage>
         _buildTabButton(1, '历史数据', Icons.analytics),
         const SizedBox(width: 4),
         _buildTabButton(2, '系统设置', Icons.settings),
+        const SizedBox(width: 4),
+        _buildTabButton(3, '设备状态', Icons.lan),
       ],
     );
   }
@@ -426,32 +513,24 @@ class _MainPageState extends State<MainPage>
     );
   }
 
-  /// 时钟显示
+  /// 时钟显示 (使用Timer而非StreamBuilder，避免无法取消的Stream)
   Widget _buildClock() {
-    return StreamBuilder(
-      stream: Stream.periodic(const Duration(seconds: 1)),
-      builder: (context, snapshot) {
-        final now = DateTime.now();
-        final timeStr =
-            '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: TechColors.bgMedium,
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: TechColors.glowCyan.withOpacity(0.3)),
-          ),
-          child: Text(
-            timeStr,
-            style: TextStyle(
-              color: TechColors.glowCyan,
-              fontSize: 13,
-              fontFamily: 'monospace',
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        );
-      },
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: TechColors.bgMedium,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: TechColors.glowCyan.withOpacity(0.3)),
+      ),
+      child: Text(
+        _clockTime.isEmpty ? '--:--:--' : _clockTime,
+        style: TextStyle(
+          color: TechColors.glowCyan,
+          fontSize: 13,
+          fontFamily: 'monospace',
+          fontWeight: FontWeight.w500,
+        ),
+      ),
     );
   }
 

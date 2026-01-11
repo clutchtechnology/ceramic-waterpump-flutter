@@ -26,27 +26,42 @@ class _AlarmLogPageState extends State<AlarmLogPage> {
     _loadData();
   }
 
+  @override
+  void dispose() {
+    // 释放服务资源
+    _alarmService.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadData() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
-    final now = DateTime.now();
-    final startTime = now.subtract(Duration(hours: _queryHours));
+    try {
+      final now = DateTime.now();
+      final startTime = now.subtract(Duration(hours: _queryHours));
 
-    final results = await Future.wait([
-      _alarmService.fetchAlarms(
-        startTime: startTime,
-        endTime: now,
-        level: _selectedLevel,
-        limit: 200,
-      ),
-      _alarmService.fetchAlarmCount(hours: _queryHours),
-    ]);
+      final results = await Future.wait([
+        _alarmService.fetchAlarms(
+          startTime: startTime,
+          endTime: now,
+          level: _selectedLevel,
+          limit: 200,
+        ),
+        _alarmService.fetchAlarmCount(hours: _queryHours),
+      ]);
 
-    setState(() {
-      _alarms = results[0] as List<AlarmRecord>;
-      _alarmCount = results[1] as AlarmCount;
-      _isLoading = false;
-    });
+      if (!mounted) return;
+      setState(() {
+        _alarms = results[0] as List<AlarmRecord>;
+        _alarmCount = results[1] as AlarmCount;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('[AlarmLogPage] 加载数据失败: $e');
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -55,7 +70,8 @@ class _AlarmLogPageState extends State<AlarmLogPage> {
       backgroundColor: TechColors.bgDeep,
       appBar: AppBar(
         backgroundColor: TechColors.bgDark,
-        title: const Text('报警日志', style: TextStyle(color: TechColors.textPrimary)),
+        title:
+            const Text('报警日志', style: TextStyle(color: TechColors.textPrimary)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: TechColors.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
@@ -75,7 +91,8 @@ class _AlarmLogPageState extends State<AlarmLogPage> {
           Expanded(
             child: _isLoading
                 ? const Center(
-                    child: CircularProgressIndicator(color: TechColors.glowCyan),
+                    child:
+                        CircularProgressIndicator(color: TechColors.glowCyan),
                   )
                 : _alarms.isEmpty
                     ? _buildEmptyState()
@@ -100,11 +117,14 @@ class _AlarmLogPageState extends State<AlarmLogPage> {
           // 统计卡片
           Row(
             children: [
-              _buildCountCard('报警', _alarmCount?.alarm ?? 0, TechColors.statusAlarm),
+              _buildCountCard(
+                  '报警', _alarmCount?.alarm ?? 0, TechColors.statusAlarm),
               const SizedBox(width: 12),
-              _buildCountCard('警告', _alarmCount?.warning ?? 0, TechColors.statusWarning),
+              _buildCountCard(
+                  '警告', _alarmCount?.warning ?? 0, TechColors.statusWarning),
               const SizedBox(width: 12),
-              _buildCountCard('总计', _alarmCount?.total ?? 0, TechColors.glowCyan),
+              _buildCountCard(
+                  '总计', _alarmCount?.total ?? 0, TechColors.glowCyan),
             ],
           ),
           const SizedBox(height: 12),

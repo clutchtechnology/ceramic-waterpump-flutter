@@ -1,8 +1,14 @@
+/// 阈值配置状态管理 Provider
+///
+/// 功能职责:
+/// - [P-1] 本地持久化存储阈值配置 (SharedPreferences)
+/// - [P-2] 同步阈值配置到后端
+/// - [P-3] 提供阈值颜色判断接口 (正常/警告/报警)
+/// - [P-4] 支持实时更新和重置默认值
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api/index.dart';
-import '../api/api.dart';
 
 /// 阈值颜色配置 (固定三色)
 class ThresholdColors {
@@ -303,10 +309,13 @@ class ThresholdConfigProvider extends ChangeNotifier {
       final jsonString = jsonEncode(_toJson());
       await prefs.setString(_storageKey, jsonString);
       notifyListeners();
-      
-      // 同步到后端
-      _syncToBackend();
-      
+
+      // 同步到后端 (await 确保同步完成)
+      final syncSuccess = await _syncToBackend();
+      if (!syncSuccess) {
+        debugPrint('⚠️ 本地保存成功，但后端同步失败');
+      }
+
       return true;
     } catch (e) {
       debugPrint('保存阈值配置失败: $e');
@@ -319,9 +328,10 @@ class ThresholdConfigProvider extends ChangeNotifier {
     try {
       final apiClient = ApiClient();
       final backendConfig = _toBackendJson();
-      
-      final response = await apiClient.post(Api.thresholds, body: backendConfig);
-      
+
+      final response =
+          await apiClient.post(Api.thresholds, body: backendConfig);
+
       if (response != null && response['success'] == true) {
         debugPrint('✅ 阈值配置已同步到后端');
         return true;

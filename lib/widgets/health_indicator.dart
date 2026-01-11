@@ -133,7 +133,7 @@ class HealthStatusBar extends StatelessWidget {
                 color: TechColors.glowCyan.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.refresh,
                 size: 14,
                 color: TechColors.glowCyan,

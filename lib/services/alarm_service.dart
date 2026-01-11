@@ -1,5 +1,12 @@
+// 报警服务 - 管理报警记录的查询和确认
+// ============================================================
+// 功能职责:
+//   - [A-1] 查询历史报警记录 (支持时间范围/级别/设备筛选)
+//   - [A-2] 确认/批量确认报警
+//   - [A-3] 获取报警统计信息
+// ============================================================
+import 'package:flutter/foundation.dart';
 import '../api/index.dart';
-import '../api/api.dart';
 
 /// 报警记录模型
 class AlarmRecord {
@@ -129,7 +136,7 @@ class AlarmService {
             .toList();
       }
     } catch (e) {
-      print('[AlarmService] 查询报警日志失败: $e');
+      debugPrint('[AlarmService] 查询报警日志失败: $e');
     }
 
     return [];
@@ -146,9 +153,14 @@ class AlarmService {
         return AlarmCount.fromJson(data);
       }
     } catch (e) {
-      print('[AlarmService] 获取报警统计失败: $e');
+      debugPrint('[AlarmService] 获取报警统计失败: $e');
     }
 
     return AlarmCount(warning: 0, alarm: 0, total: 0);
+  }
+
+  /// 释放资源 (预留接口，当前 ApiClient 为单例无需释放)
+  void dispose() {
+    // ApiClient 是单例，由应用退出时统一释放
   }
 }
