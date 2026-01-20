@@ -7,7 +7,14 @@ import '../widgets/tech_line_widgets.dart';
 /// 设备状态位显示页面
 /// 显示 DB3 (DataState) 的模块状态
 class SensorStatusPage extends StatefulWidget {
-  const SensorStatusPage({super.key});
+  const SensorStatusPage({
+    super.key,
+    required this.dbKey,
+    required this.title,
+  });
+
+  final String dbKey;
+  final String title;
 
   @override
   State<SensorStatusPage> createState() => SensorStatusPageState();
@@ -141,7 +148,8 @@ class SensorStatusPageState extends State<SensorStatusPage> {
           Expanded(
             child: _errorMessage != null
                 ? _buildErrorWidget()
-                : _buildStatusList(_response?.db3Status ?? []),
+                : _buildStatusList(
+                    _response?.getStatusByDb(widget.dbKey) ?? []),
           ),
         ],
       ),
@@ -150,10 +158,13 @@ class SensorStatusPageState extends State<SensorStatusPage> {
 
   /// 顶部状态栏
   Widget _buildHeader() {
-    final summary = _response?.summary;
-    final totalCount = summary?.total ?? 0;
-    final normalCount = summary?.normal ?? 0;
-    final errorCount = summary?.error ?? 0;
+    final statusList = _response?.getStatusByDb(widget.dbKey) ?? [];
+    final summary = _response?.getSummaryByDb(widget.dbKey);
+    final totalCount = summary?.total ?? statusList.length;
+    final normalCount =
+        summary?.normal ?? statusList.where((item) => item.isNormal).length;
+    final errorCount =
+        summary?.error ?? statusList.where((item) => !item.isNormal).length;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -169,8 +180,8 @@ class SensorStatusPageState extends State<SensorStatusPage> {
       child: Row(
         children: [
           // 标题
-          const Text(
-            '设备状态位监控 (DB3)',
+          Text(
+            widget.title,
             style: TextStyle(
               color: TechColors.textPrimary,
               fontSize: 16,

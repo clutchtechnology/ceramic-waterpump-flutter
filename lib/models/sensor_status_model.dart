@@ -114,6 +114,9 @@ class DeviceStatusResponse {
   // 18, 统计信息
   final StatusSummary? summary;
 
+  // 18.1, 各DB统计信息
+  final Map<String, StatusSummary>? summaryByDb;
+
   // 19, 数据来源 (mock/plc)
   final String? source;
 
@@ -127,6 +130,7 @@ class DeviceStatusResponse {
     required this.success,
     this.data,
     this.summary,
+    this.summaryByDb,
     this.source,
     this.error,
     this.timestamp,
@@ -148,6 +152,17 @@ class DeviceStatusResponse {
       });
     }
 
+    // 18.1, 解析 summary_by_db
+    Map<String, StatusSummary>? summaryByDb;
+    if (json['summary_by_db'] != null && json['summary_by_db'] is Map) {
+      summaryByDb = {};
+      (json['summary_by_db'] as Map).forEach((key, value) {
+        if (value is Map<String, dynamic>) {
+          summaryByDb![key] = StatusSummary.fromJson(value);
+        }
+      });
+    }
+
     return DeviceStatusResponse(
       // 16, 解析成功标志
       success: json['success'] ?? false,
@@ -157,6 +172,7 @@ class DeviceStatusResponse {
       summary: json['summary'] != null
           ? StatusSummary.fromJson(json['summary'])
           : null,
+      summaryByDb: summaryByDb,
       // 19, 解析数据来源
       source: json['source'],
       // 20, 解析错误信息
@@ -168,4 +184,13 @@ class DeviceStatusResponse {
 
   /// 17, 获取 DB3 状态列表 (所有设备通信状态)
   List<DeviceStatus> get db3Status => data?['db3'] ?? [];
+
+  /// 17.1, 获取 DB1 状态列表
+  List<DeviceStatus> get db1Status => data?['db1'] ?? [];
+
+  /// 获取指定DB状态列表
+  List<DeviceStatus> getStatusByDb(String dbKey) => data?[dbKey] ?? [];
+
+  /// 获取指定DB统计信息
+  StatusSummary? getSummaryByDb(String dbKey) => summaryByDb?[dbKey];
 }

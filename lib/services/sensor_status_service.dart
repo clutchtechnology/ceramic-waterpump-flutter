@@ -1,14 +1,14 @@
 // 设备状态位API服务
 // ============================================================
 // 功能:
-//   - [SS-1] 获取 DB3 设备通信状态数据
+//   - [SS-1] 获取 DB1/DB3 设备通信状态数据
 //   - [SS-2] 后端已解析，前端直接使用
 // ============================================================
 
 import '../api/index.dart';
 import '../models/sensor_status_model.dart';
 
-/// [SS-1] 设备状态服务 - 负责查询 DB3 状态位
+/// [SS-1] 设备状态服务 - 负责查询 DB1/DB3 状态位
 class SensorStatusService {
   final ApiClient _apiClient = ApiClient();
 

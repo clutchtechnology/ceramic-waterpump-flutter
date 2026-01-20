@@ -40,8 +40,9 @@ class _MainPageState extends State<MainPage>
   // 4, HistoryDataPage 的 GlobalKey，用于调用刷新方法
   final GlobalKey<HistoryDataPageState> _historyPageKey = GlobalKey();
 
-  // 5, SensorStatusPage 的 GlobalKey，用于控制轮询
-  final GlobalKey<SensorStatusPageState> _sensorStatusPageKey = GlobalKey();
+  // 5, 状态页 GlobalKey，用于控制轮询
+  final GlobalKey<SensorStatusPageState> _db1StatusPageKey = GlobalKey();
+  final GlobalKey<SensorStatusPageState> _db3StatusPageKey = GlobalKey();
 
   // 6, 跟踪当前 Tab 索引 (用于控制轮询)
   int _currentTabIndex = 0;
@@ -64,7 +65,7 @@ class _MainPageState extends State<MainPage>
   void initState() {
     super.initState();
     // 1, 初始化 Tab 控制器
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _tabController.addListener(_onTabChanged);
 
     // 3, 加载阈值配置并监听变化
@@ -96,18 +97,23 @@ class _MainPageState extends State<MainPage>
     final oldIndex = _currentTabIndex;
     _currentTabIndex = newIndex;
 
-    // 5, 离开设备状态页时暂停轮询
+    // 5, 离开状态页时暂停轮询
     if (oldIndex == 3) {
-      _sensorStatusPageKey.currentState?.pausePolling();
+      _db1StatusPageKey.currentState?.pausePolling();
+    }
+    if (oldIndex == 4) {
+      _db3StatusPageKey.currentState?.pausePolling();
     }
 
     // 4, 进入历史数据页面时刷新
     if (newIndex == 1) {
       _historyPageKey.currentState?.refreshData();
     }
-    // 5, 进入设备状态页面时恢复轮询
+    // 5, 进入状态页面时恢复轮询
     else if (newIndex == 3) {
-      _sensorStatusPageKey.currentState?.resumePolling();
+      _db1StatusPageKey.currentState?.resumePolling();
+    } else if (newIndex == 4) {
+      _db3StatusPageKey.currentState?.resumePolling();
     }
   }
 
@@ -231,8 +237,18 @@ class _MainPageState extends State<MainPage>
                 HistoryDataPage(key: _historyPageKey),
                 // Tab3: 系统设置 - 传入共享的阈值配置Provider
                 SettingsPage(thresholdProvider: _thresholdProvider),
-                // Tab4: 设备状态 - 使用GlobalKey控制轮询
-                SensorStatusPage(key: _sensorStatusPageKey),
+                // Tab4: DB1 状态 - 使用GlobalKey控制轮询
+                SensorStatusPage(
+                  key: _db1StatusPageKey,
+                  dbKey: 'db1',
+                  title: '设备状态位监控 (DB1)',
+                ),
+                // Tab5: DB3 状态 - 使用GlobalKey控制轮询
+                SensorStatusPage(
+                  key: _db3StatusPageKey,
+                  dbKey: 'db3',
+                  title: '设备状态位监控 (DB3)',
+                ),
               ],
             ),
           ),
@@ -326,7 +342,9 @@ class _MainPageState extends State<MainPage>
         const SizedBox(width: 4),
         _buildTabButton(2, '系统设置', Icons.settings),
         const SizedBox(width: 4),
-        _buildTabButton(3, '设备状态', Icons.lan),
+        _buildTabButton(3, 'DB1状态', Icons.lan),
+        const SizedBox(width: 4),
+        _buildTabButton(4, 'DB3状态', Icons.lan),
       ],
     );
   }
