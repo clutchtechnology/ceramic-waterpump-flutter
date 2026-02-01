@@ -8,6 +8,7 @@ import '../widgets/custom_card_widget.dart';
 import '../widgets/health_indicator.dart';
 import '../services/health_service.dart';
 import '../services/realtime_service.dart';
+import '../services/websocket_service.dart';
 import '../models/pump_data.dart';
 import '../providers/threshold_config_provider.dart';
 import 'history_data_page.dart';
@@ -33,6 +34,7 @@ class _MainPageState extends State<MainPage>
   // 2, 服务单例 (避免重复创建)
   final HealthService _healthService = HealthService();
   final RealtimeService _realtimeService = RealtimeService();
+  final WebSocketService _wsService = WebSocketService();
 
   // 3, 阈值配置 Provider (共享给 SettingsPage)
   final ThresholdConfigProvider _thresholdProvider = ThresholdConfigProvider();
@@ -60,6 +62,9 @@ class _MainPageState extends State<MainPage>
 
   // 9, 实时数据
   RealtimeBatchResponse? _realtimeData;
+
+  // 10, WebSocket 连接状态
+  WebSocketState _wsState = WebSocketState.disconnected;
 
   @override
   void initState() {
@@ -162,6 +167,9 @@ class _MainPageState extends State<MainPage>
     _healthService.dispose();
     _realtimeService.dispose();
 
+    // 释放 WebSocket 服务 (应用退出时)
+    _wsService.dispose();
+
     // 清理 HTTP 客户端 (应用退出时)
     ApiClient.dispose();
 
@@ -196,6 +204,15 @@ class _MainPageState extends State<MainPage>
         debugPrint('[MainPage] 实时数据错误: $error');
         return true;
       }());
+    };
+
+    // 监听 WebSocket 连接状态
+    _realtimeService.onConnectionStateChanged = (state) {
+      if (mounted) {
+        setState(() {
+          _wsState = state;
+        });
+      }
     };
 
     _realtimeService.startPolling(intervalSeconds: 5);

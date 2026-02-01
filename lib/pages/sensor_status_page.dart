@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../models/sensor_status_model.dart';
 import '../services/sensor_status_service.dart';
+import '../services/websocket_service.dart';
 import '../widgets/tech_line_widgets.dart';
 
 /// 设备状态位显示页面
@@ -25,8 +26,8 @@ class SensorStatusPageState extends State<SensorStatusPage> {
   // 1, 设备状态服务
   final SensorStatusService _statusService = SensorStatusService();
 
-  // 2, 轮询定时器
-  Timer? _timer;
+  // 2, WebSocket 服务 (用于监听连接状态)
+  final WebSocketService _wsService = WebSocketService();
 
   // 3, 设备状态响应数据
   DeviceStatusResponse? _response;
@@ -48,57 +49,55 @@ class SensorStatusPageState extends State<SensorStatusPage> {
 
   @override
   void dispose() {
-    // 2, 确保定时器被取消
-    _stopTimer();
+    // 2, 确保服务被释放
+    _statusService.dispose();
     super.dispose();
-  }
-
-  /// 2, 停止定时器
-  void _stopTimer() {
-    _timer?.cancel();
-    _timer = null;
-  }
-
-  /// 2, 启动定时器 (每 5 秒轮询)
-  void _startTimer() {
-    _stopTimer(); // 2.1, 先停止旧的
-    // 6, 检查轮询是否激活
-    if (!_isPollingActive) return;
-
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) async {
-      // 6, 检查 mounted 和轮询状态
-      if (!mounted || !_isPollingActive) {
-        _stopTimer(); // 使用统一方法停止，保持 _timer 引用一致
-        return;
-      }
-      try {
-        await _fetchData();
-      } catch (e) {
-        // 5, 记录异常但不中断定时器
-        debugPrint('状态位定时器回调异常: $e');
-      }
-    });
   }
 
   /// 6, 暂停轮询 (Tab 切出时调用)
   void pausePolling() {
     _isPollingActive = false;
-    _stopTimer();
+    _statusService.pausePolling();
   }
 
   /// 6, 恢复轮询 (Tab 切入时调用)
   void resumePolling() {
     _isPollingActive = true;
-    _startTimer();
+    _statusService.resumePolling();
     _fetchData(); // 立即刷新一次
   }
 
   Future<void> _initData() async {
+    // 设置 WebSocket 回调
+    _statusService.onDataUpdate = (data) {
+      if (mounted && _isPollingActive) {
+        setState(() {
+          if (data.success) {
+            _response = data;
+            _errorMessage = null;
+          } else {
+            _errorMessage = data.error ?? '获取状态失败';
+          }
+        });
+      }
+    };
+
+    _statusService.onError = (error) {
+      if (mounted && _isPollingActive) {
+        setState(() {
+          _errorMessage = error;
+        });
+      }
+    };
+
+    // 启动 WebSocket 订阅
+    _statusService.startPolling();
+
+    // 同时通过 HTTP 获取一次初始数据
     await _fetchData();
-    _startTimer();
   }
 
-  /// 3, 获取设备状态数据
+  /// 3, 获取设备状态数据 (HTTP 手动刷新)
   Future<void> _fetchData() async {
     // 4, 防止重复刷新
     if (_isRefreshing || !mounted) return;

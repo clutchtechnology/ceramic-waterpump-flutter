@@ -70,4 +70,15 @@ class Api {
 
   /// 13, 获取设备通信状态 (6 泵 + 1 压力表的在线/离线状态)
   static const String deviceStatus = '/api/waterpump/status/devices';
+
+  // ============================================================
+  // WebSocket 接口 (实时数据推送)
+  // ============================================================
+
+  /// 14, WebSocket 基础地址
+  static String get wsBaseUrl =>
+      baseUrl.replaceFirst('http://', 'ws://').replaceFirst('https://', 'wss://');
+
+  /// 15, WebSocket 实时数据端点
+  static String get wsUrl => '$wsBaseUrl/ws/realtime';
 }
