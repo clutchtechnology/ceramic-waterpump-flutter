@@ -39,9 +39,10 @@ class Api {
   // 历史数据接口 (InfluxDB 查询)
   // ============================================================
 
-  /// 8, 历史数据查询
-  /// 参数: pump_id(1-6), parameter(voltage/current/power/pressure),
-  ///       interval(5s/1m/5m/1h), start, end (ISO 8601)
+  /// 8, 统一历史数据查询接口
+  /// 参数: parameter(power/energy/current/voltage/pressure/vibration_velocity/vibration_displacement/vibration_frequency)
+  ///       pump_id(1-6, 压力查询时不需要), interval(5s/1m/5m/1h, 可选), start, end (ISO 8601)
+  /// 示例: /api/waterpump/history?parameter=power&pump_id=1&start=2024-01-01T00:00:00Z&end=2024-01-02T00:00:00Z
   static const String history = '/api/waterpump/history';
 
   /// 9, 统计数据 (日/周/月汇总)
@@ -76,8 +77,9 @@ class Api {
   // ============================================================
 
   /// 14, WebSocket 基础地址
-  static String get wsBaseUrl =>
-      baseUrl.replaceFirst('http://', 'ws://').replaceFirst('https://', 'wss://');
+  static String get wsBaseUrl => baseUrl
+      .replaceFirst('http://', 'ws://')
+      .replaceFirst('https://', 'wss://');
 
   /// 15, WebSocket 实时数据端点
   static String get wsUrl => '$wsBaseUrl/ws/realtime';

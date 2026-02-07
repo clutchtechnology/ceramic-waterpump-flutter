@@ -4,74 +4,162 @@
 // ============================================================
 
 // ============================================================
-// 1, 单个水泵实时数据 (对应 DB8 数据块)
+// 1, 单个水泵实时数据 (对应 DB2 数据块)
 // ============================================================
 class PumpData {
   // 2, 水泵编号 (1-6)
   final int id;
 
-  // 3, 电压值 (V) - 三相电压均值
-  final double voltage;
-
-  // 4, 电流值 (A) - 三相电流均值
-  final double current;
-
-  // 5, 功率值 (kW) - 有功功率
-  final double power;
-
-  // 6, 运行状态 (normal/warning/alarm/offline)
+  // 3, 运行状态 (running/stopped)
   final String status;
 
-  // 7, 当前报警列表
-  final List<String> alarms;
+  // 4, 功率值 (kW) - 有功功率
+  final double power;
+
+  // 5, 能耗值 (kWh) - 累计电量
+  final double energy;
+
+  // 6, A相电流 (A)
+  final double currentA;
+
+  // 7, B相电流 (A)
+  final double currentB;
+
+  // 8, C相电流 (A)
+  final double currentC;
+
+  // 9, A相电压 (V)
+  final double voltageA;
+
+  // 10, B相电压 (V)
+  final double voltageB;
+
+  // 11, C相电压 (V)
+  final double voltageC;
+
+  // 12, X轴振动速度 (mm/s)
+  final double vibVelocityX;
+
+  // 13, Y轴振动速度 (mm/s)
+  final double vibVelocityY;
+
+  // 14, Z轴振动速度 (mm/s)
+  final double vibVelocityZ;
+
+  // 15, X轴振动位移 (μm)
+  final double vibDisplacementX;
+
+  // 16, Y轴振动位移 (μm)
+  final double vibDisplacementY;
+
+  // 17, Z轴振动位移 (μm)
+  final double vibDisplacementZ;
+
+  // 18, X轴振动频率 (Hz)
+  final double vibFrequencyX;
+
+  // 19, Y轴振动频率 (Hz)
+  final double vibFrequencyY;
+
+  // 20, Z轴振动频率 (Hz)
+  final double vibFrequencyZ;
 
   PumpData({
     required this.id,
-    required this.voltage,
-    required this.current,
-    required this.power,
     required this.status,
-    required this.alarms,
+    required this.power,
+    required this.energy,
+    required this.currentA,
+    required this.currentB,
+    required this.currentC,
+    required this.voltageA,
+    required this.voltageB,
+    required this.voltageC,
+    required this.vibVelocityX,
+    required this.vibVelocityY,
+    required this.vibVelocityZ,
+    required this.vibDisplacementX,
+    required this.vibDisplacementY,
+    required this.vibDisplacementZ,
+    required this.vibFrequencyX,
+    required this.vibFrequencyY,
+    required this.vibFrequencyZ,
   });
 
   factory PumpData.fromJson(Map<String, dynamic> json) {
     return PumpData(
       // 2, 解析水泵编号
       id: json['id'] as int? ?? 0,
-      // 3, 解析电压 (num -> double 安全转换)
-      voltage: (json['voltage'] as num?)?.toDouble() ?? 0.0,
-      // 4, 解析电流
-      current: (json['current'] as num?)?.toDouble() ?? 0.0,
-      // 5, 解析功率
+      // 3, 解析运行状态
+      status: json['status'] as String? ?? 'stopped',
+      // 4, 解析功率
       power: (json['power'] as num?)?.toDouble() ?? 0.0,
-      // 6, 解析状态
-      status: json['status'] as String? ?? 'unknown',
-      // 7, 解析报警列表
-      alarms: (json['alarms'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          [],
+      // 5, 解析能耗
+      energy: (json['energy'] as num?)?.toDouble() ?? 0.0,
+      // 6, 解析A相电流
+      currentA: (json['current_a'] as num?)?.toDouble() ?? 0.0,
+      // 7, 解析B相电流
+      currentB: (json['current_b'] as num?)?.toDouble() ?? 0.0,
+      // 8, 解析C相电流
+      currentC: (json['current_c'] as num?)?.toDouble() ?? 0.0,
+      // 9, 解析A相电压
+      voltageA: (json['voltage_a'] as num?)?.toDouble() ?? 0.0,
+      // 10, 解析B相电压
+      voltageB: (json['voltage_b'] as num?)?.toDouble() ?? 0.0,
+      // 11, 解析C相电压
+      voltageC: (json['voltage_c'] as num?)?.toDouble() ?? 0.0,
+      // 12, 解析X轴振动速度
+      vibVelocityX: (json['vib_velocity_x'] as num?)?.toDouble() ?? 0.0,
+      // 13, 解析Y轴振动速度
+      vibVelocityY: (json['vib_velocity_y'] as num?)?.toDouble() ?? 0.0,
+      // 14, 解析Z轴振动速度
+      vibVelocityZ: (json['vib_velocity_z'] as num?)?.toDouble() ?? 0.0,
+      // 15, 解析X轴振动位移
+      vibDisplacementX: (json['vib_displacement_x'] as num?)?.toDouble() ?? 0.0,
+      // 16, 解析Y轴振动位移
+      vibDisplacementY: (json['vib_displacement_y'] as num?)?.toDouble() ?? 0.0,
+      // 17, 解析Z轴振动位移
+      vibDisplacementZ: (json['vib_displacement_z'] as num?)?.toDouble() ?? 0.0,
+      // 18, 解析X轴振动频率
+      vibFrequencyX: (json['vib_frequency_x'] as num?)?.toDouble() ?? 0.0,
+      // 19, 解析Y轴振动频率
+      vibFrequencyY: (json['vib_frequency_y'] as num?)?.toDouble() ?? 0.0,
+      // 20, 解析Z轴振动频率
+      vibFrequencyZ: (json['vib_frequency_z'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
-  // 4, 是否运行中 (电流 > 0.1A 表示电机启动)
-  bool get isRunning => current > 0.1;
+  // 4, 是否运行中
+  bool get isRunning => status == 'running';
 
-  // 6, 是否有报警
-  bool get hasAlarm => status == 'alarm' || alarms.isNotEmpty;
+  // 6, 三相电流平均值
+  double get currentAvg => (currentA + currentB + currentC) / 3;
 
-  // 6, 是否有警告
-  bool get hasWarning => status == 'warning';
+  // 9, 三相电压平均值
+  double get voltageAvg => (voltageA + voltageB + voltageC) / 3;
 
   /// 创建离线状态空数据
   factory PumpData.empty(int id) {
     return PumpData(
       id: id,
-      voltage: 0.0,
-      current: 0.0,
+      status: 'stopped',
       power: 0.0,
-      status: 'offline',
-      alarms: [],
+      energy: 0.0,
+      currentA: 0.0,
+      currentB: 0.0,
+      currentC: 0.0,
+      voltageA: 0.0,
+      voltageB: 0.0,
+      voltageC: 0.0,
+      vibVelocityX: 0.0,
+      vibVelocityY: 0.0,
+      vibVelocityZ: 0.0,
+      vibDisplacementX: 0.0,
+      vibDisplacementY: 0.0,
+      vibDisplacementZ: 0.0,
+      vibFrequencyX: 0.0,
+      vibFrequencyY: 0.0,
+      vibFrequencyZ: 0.0,
     );
   }
 }

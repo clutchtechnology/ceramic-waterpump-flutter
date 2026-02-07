@@ -66,6 +66,10 @@ class _MainPageState extends State<MainPage>
   // 10, WebSocket 连接状态
   WebSocketState _wsState = WebSocketState.disconnected;
 
+  // 11, UI 更新计数器 (用于日志)
+  int _uiUpdateCount = 0;
+  DateTime? _lastUiUpdateTime;
+
   @override
   void initState() {
     super.initState();
@@ -192,6 +196,18 @@ class _MainPageState extends State<MainPage>
   void _startRealtimePolling() {
     _realtimeService.onDataUpdate = (data) {
       if (mounted) {
+        _uiUpdateCount++;
+        final now = DateTime.now();
+        final interval = _lastUiUpdateTime != null 
+            ? now.difference(_lastUiUpdateTime!).inMilliseconds 
+            : 0;
+        _lastUiUpdateTime = now;
+
+        // 每 10 次更新打印一次日志
+        if (_uiUpdateCount % 10 == 0) {
+          print('[MainPage] UI 更新第 $_uiUpdateCount 次，间隔: ${interval}ms');
+        }
+
         setState(() {
           _realtimeData = data;
         });
@@ -428,8 +444,8 @@ class _MainPageState extends State<MainPage>
                 padding: const EdgeInsets.all(4),
                 child: Row(
                   children: [
-                    _buildPumpCardFromData(pumps.length > 0 ? pumps[0] : null,
-                        pressure: pressure),
+                    _buildPumpCardFromData(
+                        pumps.length > 0 ? pumps[0] : null, pressure),
                     const SizedBox(width: 4),
                     _buildPumpCardFromData(pumps.length > 1 ? pumps[1] : null),
                     const SizedBox(width: 4),
@@ -464,7 +480,7 @@ class _MainPageState extends State<MainPage>
   }
 
   /// 从 PumpData 构建水泵卡片
-  Widget _buildPumpCardFromData(PumpData? pump, {PressureData? pressure}) {
+  Widget _buildPumpCardFromData(PumpData? pump, [PressureData? pressure]) {
     if (pump == null) {
       return Expanded(
         child: CustomCardWidget(
@@ -474,8 +490,19 @@ class _MainPageState extends State<MainPage>
           currentA: 0.0,
           currentB: 0.0,
           currentC: 0.0,
+          voltageA: 0.0,
+          voltageB: 0.0,
+          voltageC: 0.0,
           isRunning: false,
-          vibration: 0.0,
+          vibVelocityX: 0.0,
+          vibVelocityY: 0.0,
+          vibVelocityZ: 0.0,
+          vibDisplacementX: 0.0,
+          vibDisplacementY: 0.0,
+          vibDisplacementZ: 0.0,
+          vibFrequencyX: 0.0,
+          vibFrequencyY: 0.0,
+          vibFrequencyZ: 0.0,
         ),
       );
     }
@@ -484,9 +511,9 @@ class _MainPageState extends State<MainPage>
     final pumpIndex = pump.id;
     final powerColor = _thresholdProvider.getPowerColor(pumpIndex, pump.power);
     final currentColor =
-        _thresholdProvider.getCurrentColor(pumpIndex, pump.current);
-    final vibrationColor =
-        _thresholdProvider.getVibrationColor(pumpIndex, 0.0); // 振动暂无数据
+        _thresholdProvider.getCurrentColor(pumpIndex, pump.currentAvg);
+    final vibrationColor = _thresholdProvider.getVibrationColor(
+        pumpIndex, (pump.vibVelocityX + pump.vibVelocityY + pump.vibVelocityZ) / 3);
     final pressureColor = pressure != null
         ? _thresholdProvider.getPressureColor(pressure.value)
         : null;
@@ -495,13 +522,24 @@ class _MainPageState extends State<MainPage>
       child: CustomCardWidget(
         pumpNumber: '#${pump.id}',
         power: pump.power,
-        energy: 0.0, // API 暂无能耗数据
-        currentA: pump.current,
-        currentB: pump.current, // 暂用同一值
-        currentC: pump.current, // 暂用同一值
+        energy: pump.energy,
+        currentA: pump.currentA,
+        currentB: pump.currentB,
+        currentC: pump.currentC,
+        voltageA: pump.voltageA,
+        voltageB: pump.voltageB,
+        voltageC: pump.voltageC,
         isRunning: pump.isRunning,
-        vibration: 0.0, // 振动数据占位，暂不使用
-        pressure: pressure?.value, // 仅1号泵显示压力
+        vibVelocityX: pump.vibVelocityX,
+        vibVelocityY: pump.vibVelocityY,
+        vibVelocityZ: pump.vibVelocityZ,
+        vibDisplacementX: pump.vibDisplacementX,
+        vibDisplacementY: pump.vibDisplacementY,
+        vibDisplacementZ: pump.vibDisplacementZ,
+        vibFrequencyX: pump.vibFrequencyX,
+        vibFrequencyY: pump.vibFrequencyY,
+        vibFrequencyZ: pump.vibFrequencyZ,
+        pressure: pressure?.value, // 仅 #1 水泵传入压力
         // 阈值颜色
         powerColor: powerColor,
         currentColor: currentColor,

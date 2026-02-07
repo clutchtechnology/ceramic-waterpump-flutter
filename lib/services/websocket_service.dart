@@ -79,6 +79,10 @@ class WebSocketService {
   // 13, WebSocket URL (可动态配置)
   String _wsUrl = Api.wsUrl;
 
+  // 14, 消息接收计数器 (用于日志)
+  int _messageReceivedCount = 0;
+  DateTime? _lastMessageTime;
+
   // ============================================================
   // 回调函数
   // ============================================================
@@ -230,8 +234,20 @@ class WebSocketService {
     if (_isDisposed) return;
 
     try {
+      _messageReceivedCount++;
+      final now = DateTime.now();
+      final interval = _lastMessageTime != null 
+          ? now.difference(_lastMessageTime!).inMilliseconds 
+          : 0;
+      _lastMessageTime = now;
+
       final message = jsonDecode(data as String) as Map<String, dynamic>;
       final type = message['type'] as String?;
+
+      // 每 10 条消息打印一次日志
+      if (_messageReceivedCount % 10 == 0) {
+        print('[WebSocket] 收到第 $_messageReceivedCount 条消息 (类型: $type)，间隔: ${interval}ms');
+      }
 
       switch (type) {
         case WsMessageType.realtimeData:
@@ -258,11 +274,22 @@ class WebSocketService {
   /// 28, 处理实时数据
   void _handleRealtimeData(Map<String, dynamic> message) {
     try {
-      // 28.1, 从 message 中提取 data 字段，构造与 HTTP 响应兼容的格式
+      // 28.1, 检查回调是否设置
+      if (onRealtimeDataUpdate == null) {
+        print('[WebSocket] 警告: onRealtimeDataUpdate 回调未设置！');
+        return;
+      }
+      
+      // 28.2, 从 message 中提取 data 字段，构造与 HTTP 响应兼容的格式
       final response = RealtimeBatchResponse.fromJson(message);
+      
+      // 28.3, 调用回调
       onRealtimeDataUpdate?.call(response);
-    } catch (e) {
-      _logError('实时数据解析失败: $e');
+    } catch (e, stackTrace) {
+      // 强制打印错误，不受频率控制
+      print('[WebSocket] 实时数据解析失败: $e');
+      print('[WebSocket] 消息内容: $message');
+      print('[WebSocket] 堆栈跟踪: $stackTrace');
     }
   }
 
@@ -270,9 +297,17 @@ class WebSocketService {
   void _handleDeviceStatus(Map<String, dynamic> message) {
     try {
       final response = DeviceStatusResponse.fromJson(message);
+      
+      // 检查回调是否设置
+      if (onDeviceStatusUpdate == null) {
+        // device_status 回调未设置是正常的，不打印警告
+        return;
+      }
+      
       onDeviceStatusUpdate?.call(response);
-    } catch (e) {
+    } catch (e, stackTrace) {
       _logError('设备状态解析失败: $e');
+      print('[WebSocket] 堆栈跟踪: $stackTrace');
     }
   }
 

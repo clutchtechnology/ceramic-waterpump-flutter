@@ -1,16 +1,20 @@
+// 历史数据页面 - 8宫格布局
+// ============================================================
+// 功能:
+//   - 8个图表: 功率/能耗/电流/电压/压力/速度/位移/频率
+//   - 每个图表独立查询和刷新
+//   - 默认查询最近24小时数据
+//   - 自动聚合间隔计算
+// ============================================================
+
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:async';
 import '../widgets/tech_line_widgets.dart';
-import '../widgets/data_display/tech_line_chart.dart';
-import '../widgets/data_display/tech_bar_chart.dart';
-import '../widgets/data_display/time_range_selector.dart';
+import '../widgets/history_chart_card.dart';
 import '../services/history_service.dart';
-import '../providers/threshold_config_provider.dart';
 
-/// 历史数据页面
-/// 上部分：振动幅值和压力的柱状图 + 历史曲线
-/// 下部分：电表能耗和功率的历史曲线
+/// 历史数据页面 - 8宫格布局
 class HistoryDataPage extends StatefulWidget {
   const HistoryDataPage({super.key});
 
@@ -18,610 +22,325 @@ class HistoryDataPage extends StatefulWidget {
   State<HistoryDataPage> createState() => HistoryDataPageState();
 }
 
-/// 暴露给外部调用的刷新方法
-/// 注意：移除 AutomaticKeepAliveClientMixin 避免内存泄漏
 class HistoryDataPageState extends State<HistoryDataPage> {
-  bool _isLoading = false;
-  bool _isInitialized = false;
-
   // 历史数据服务
   final HistoryService _historyService = HistoryService();
-
-  // 阈值配置Provider (从设置页面读取)
-  final ThresholdConfigProvider _thresholdProvider = ThresholdConfigProvider();
 
   // 防抖定时器
   Timer? _debounceTimer;
   static const Duration _debounceDuration = Duration(milliseconds: 500);
 
-  // ==================== 时间范围 ====================
-  late DateTime _vibrationChartStartTime;
-  late DateTime _vibrationChartEndTime;
-  late DateTime _pressureChartStartTime;
-  late DateTime _pressureChartEndTime;
-  late DateTime _energyChartStartTime;
-  late DateTime _energyChartEndTime;
-  late DateTime _powerChartStartTime;
-  late DateTime _powerChartEndTime;
+  // ==================== 8个图表的状态 ====================
+  // 1. 功率
+  int _powerSelectedPump = 1;
+  late DateTime _powerStartTime;
+  late DateTime _powerEndTime;
+  List<FlSpot> _powerData = [];
+  bool _powerLoading = false;
 
-  // ==================== 动态报警阈值 (从ThresholdConfigProvider获取) ====================
-  // 这些值会在initState和页面显示时从Provider同步
-  double _pressureHighAlarm = 1.0;
-  double _pressureLowAlarm = 0.3;
-  double _vibrationHighAlarm = 1.5;
+  // 2. 能耗
+  int _energySelectedPump = 1;
+  late DateTime _energyStartTime;
+  late DateTime _energyEndTime;
+  List<FlSpot> _energyData = [];
+  bool _energyLoading = false;
 
-  // ==================== 设备选择状态 ====================
-  // 电表选择 (6个)
-  final List<bool> _selectedMeters = List.generate(6, (_) => true);
-  // 振动选择 (6个水泵)
-  final List<bool> _selectedVibrations = List.generate(6, (_) => true);
+  // 3. 电流
+  int _currentSelectedPump = 1;
+  late DateTime _currentStartTime;
+  late DateTime _currentEndTime;
+  List<FlSpot> _currentData = [];
+  bool _currentLoading = false;
 
-  // ==================== 图表数据 ====================
-  // 振动幅值数据 (6个水泵)
-  final Map<int, List<FlSpot>> _vibrationData = {};
-  // 压力数据 (仅1号水泵)
-  final Map<int, List<FlSpot>> _pressureData = {};
-  // 电表能耗数据 (6个)
-  final Map<int, List<FlSpot>> _energyData = {};
-  // 电表功率数据 (6个)
-  final Map<int, List<FlSpot>> _powerData = {};
+  // 4. 电压
+  int _voltageSelectedPump = 1;
+  late DateTime _voltageStartTime;
+  late DateTime _voltageEndTime;
+  List<FlSpot> _voltageData = [];
+  bool _voltageLoading = false;
 
-  // 颜色配置
-  final List<Color> _meterColors = [
-    TechColors.glowCyan, // 电表1
-    TechColors.glowGreen, // 电表2
-    TechColors.glowOrange, // 电表3
-    const Color(0xFFff3b30), // 电表4
-    const Color(0xFFaf52de), // 电表5
-    const Color(0xFFffcc00), // 电表6
-  ];
+  // 5. 压力 (无水泵选择)
+  late DateTime _pressureStartTime;
+  late DateTime _pressureEndTime;
+  List<FlSpot> _pressureData = [];
+  bool _pressureLoading = false;
 
-  final List<Color> _vibrationColors = [
-    TechColors.glowCyan, // 水泵1
-    TechColors.glowGreen, // 水泵2
-    TechColors.glowOrange, // 水泵3
-    const Color(0xFFff3b30), // 水泵4
-    const Color(0xFFaf52de), // 水泵5
-    const Color(0xFFffcc00), // 水泵6
-  ];
+  // 6. 振动速度
+  int _velocitySelectedPump = 1;
+  late DateTime _velocityStartTime;
+  late DateTime _velocityEndTime;
+  List<FlSpot> _velocityData = [];
+  bool _velocityLoading = false;
 
-  // 压力颜色 (仅1号)
-  final List<Color> _pressureColors = [TechColors.glowCyan];
+  // 7. 振动位移
+  int _displacementSelectedPump = 1;
+  late DateTime _displacementStartTime;
+  late DateTime _displacementEndTime;
+  List<FlSpot> _displacementData = [];
+  bool _displacementLoading = false;
+
+  // 8. 振动频率
+  int _frequencySelectedPump = 1;
+  late DateTime _frequencyStartTime;
+  late DateTime _frequencyEndTime;
+  List<FlSpot> _frequencyData = [];
+  bool _frequencyLoading = false;
 
   @override
   void initState() {
     super.initState();
     _initializeTimeRanges();
-    _loadThresholdConfig();
-    _loadMockData();
   }
 
   @override
-  @override
   void dispose() {
-    // 1, 取消防抖定时器
     _debounceTimer?.cancel();
-    _debounceTimer = null;
-    // 2, HistoryService 使用 ApiClient 单例，无需主动释放
     super.dispose();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // 页面可见时自动刷新数据
-    if (!_isInitialized) {
-      _isInitialized = true;
-      _triggerAutoRefresh();
-    }
+  /// 初始化所有图表的时间范围 (默认最近24小时)
+  void _initializeTimeRanges() {
+    final now = DateTime.now();
+    final start = now.subtract(const Duration(hours: 24));
+
+    _powerStartTime = start;
+    _powerEndTime = now;
+    _energyStartTime = start;
+    _energyEndTime = now;
+    _currentStartTime = start;
+    _currentEndTime = now;
+    _voltageStartTime = start;
+    _voltageEndTime = now;
+    _pressureStartTime = start;
+    _pressureEndTime = now;
+    _velocityStartTime = start;
+    _velocityEndTime = now;
+    _displacementStartTime = start;
+    _displacementEndTime = now;
+    _frequencyStartTime = start;
+    _frequencyEndTime = now;
   }
 
   /// 外部调用刷新方法 (进入页面时调用)
   void refreshData() {
-    // 立即显示加载动画
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-      });
-    }
-    // 直接调用刷新，不使用防抖
-    _doRefreshAllCharts();
+    _refreshAllCharts();
   }
 
-  /// 触发自动刷新 (带防抖)
-  void _triggerAutoRefresh() {
-    _debounceTimer?.cancel();
-    _debounceTimer = Timer(_debounceDuration, () {
-      _doRefreshAllCharts();
-    });
-  }
-
-  /// 实际执行刷新所有图表数据 (最近1分钟)
-  Future<void> _doRefreshAllCharts() async {
-    // 设置加载状态
-    if (mounted && !_isLoading) {
-      setState(() {
-        _isLoading = true;
-      });
-    }
-
-    try {
-      // 同步阈值
-      await _loadThresholdConfig();
-
-      // 查询 5分钟前 到 4分钟前 的数据（避开批量写入延迟）
-      // 后端每 150 秒（2.5 分钟）批量写入一次，查询最近数据可能还未入库
-      final now = DateTime.now();
-      final end = now.subtract(const Duration(minutes: 4));
-      final start = now.subtract(const Duration(minutes: 5));
-
-      if (mounted) {
-        setState(() {
-          _vibrationChartStartTime = start;
-          _vibrationChartEndTime = end;
-          _pressureChartStartTime = start;
-          _pressureChartEndTime = end;
-          _energyChartStartTime = start;
-          _energyChartEndTime = end;
-          _powerChartStartTime = start;
-          _powerChartEndTime = end;
-        });
-      }
-
-      // 并行加载所有数据
-      await Future.wait([
-        _refreshPressureData(),
-        _refreshEnergyData(),
-        _refreshPowerData(),
-      ]);
-    } catch (e) {
-      debugPrint('刷新图表数据失败: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  /// 加载阈值配置 (从Provider同步)
-  Future<void> _loadThresholdConfig() async {
-    await _thresholdProvider.loadConfig();
-    _syncThresholds();
-  }
-
-  /// 同步阈值到本地变量
-  void _syncThresholds() {
-    if (mounted) {
-      setState(() {
-        _pressureHighAlarm = _thresholdProvider.pressureHighAlarm;
-        _pressureLowAlarm = _thresholdProvider.pressureLowAlarm;
-        // 振动阈值取第一个水泵的配置作为显示阈值
-        if (_thresholdProvider.vibrationConfigs.isNotEmpty) {
-          _vibrationHighAlarm =
-              _thresholdProvider.vibrationConfigs[0].warningMax;
-        }
-      });
-    }
-  }
-
-  /// 刷新压力数据
-  Future<void> _refreshPressureData() async {
-    try {
-      // interval 不传，由 HistoryService 自动计算最佳聚合间隔
-      final data = await _historyService.fetchPressureHistory(
-        start: _pressureChartStartTime,
-        end: _pressureChartEndTime,
-      );
-
-      if (data.isNotEmpty && mounted) {
-        setState(() {
-          _pressureData[0] = _convertToFlSpots(data);
-        });
-      }
-    } catch (e) {
-      debugPrint('加载压力历史数据失败: $e');
-    }
-  }
-
-  /// 刷新能耗数据
-  Future<void> _refreshEnergyData() async {
-    try {
-      // interval 不传，由 HistoryService 自动计算最佳聚合间隔
-      final data = await _historyService.fetchEnergyHistory(
-        start: _energyChartStartTime,
-        end: _energyChartEndTime,
-      );
-
-      setState(() {
-        for (final entry in data.entries) {
-          final pumpIndex = entry.key - 1; // pump_id 1-6 -> index 0-5
-          if (pumpIndex >= 0 && pumpIndex < 6) {
-            _energyData[pumpIndex] = _convertToFlSpots(entry.value);
-          }
-        }
-      });
-    } catch (e) {
-      debugPrint('加载能耗历史数据失败: $e');
-    }
-  }
-
-  /// 刷新功率数据
-  Future<void> _refreshPowerData() async {
-    try {
-      // interval 不传，由 HistoryService 自动计算最佳聚合间隔
-      final data = await _historyService.fetchPowerHistory(
-        start: _powerChartStartTime,
-        end: _powerChartEndTime,
-      );
-
-      setState(() {
-        for (final entry in data.entries) {
-          final pumpIndex = entry.key - 1;
-          if (pumpIndex >= 0 && pumpIndex < 6) {
-            _powerData[pumpIndex] = _convertToFlSpots(entry.value);
-          }
-        }
-      });
-    } catch (e) {
-      debugPrint('加载功率历史数据失败: $e');
-    }
+  /// 刷新所有图表数据
+  Future<void> _refreshAllCharts() async {
+    await Future.wait([
+      _refreshPowerData(),
+      _refreshEnergyData(),
+      _refreshCurrentData(),
+      _refreshVoltageData(),
+      _refreshPressureData(),
+      _refreshVelocityData(),
+      _refreshDisplacementData(),
+      _refreshFrequencyData(),
+    ]);
   }
 
   /// 转换历史数据点为FlSpot列表
   List<FlSpot> _convertToFlSpots(List<HistoryDataPoint> data) {
     if (data.isEmpty) return [];
-
     return data.asMap().entries.map((entry) {
       return FlSpot(entry.key.toDouble(), entry.value.value);
     }).toList();
   }
 
-  void _initializeTimeRanges() {
-    final now = DateTime.now();
-    final end = now.subtract(const Duration(seconds: 30));
-    final start = end.subtract(const Duration(minutes: 5));
-
-    _vibrationChartStartTime = start;
-    _vibrationChartEndTime = end;
-    _pressureChartStartTime = start;
-    _pressureChartEndTime = end;
-    _energyChartStartTime = start;
-    _energyChartEndTime = end;
-    _powerChartStartTime = start;
-    _powerChartEndTime = end;
-  }
-
-  /// 加载模拟数据（后续替换为API调用）
-  void _loadMockData() {
-    // 生成模拟振动数据 (6个水泵)
-    for (int i = 0; i < 6; i++) {
-      _vibrationData[i] = List.generate(20, (j) {
-        return FlSpot(j.toDouble(), 0.5 + (i * 0.1) + (j % 5) * 0.1);
-      });
-    }
-
-    // 生成模拟压力数据 (仅1号)
-    _pressureData[0] = List.generate(20, (j) {
-      return FlSpot(j.toDouble(), 0.4 + (j % 5) * 0.15);
-    });
-
-    // 生成模拟能耗数据 (6个电表)
-    for (int i = 0; i < 6; i++) {
-      _energyData[i] = List.generate(20, (j) {
-        return FlSpot(j.toDouble(), 100.0 + i * 50 + j * 5.0);
-      });
-    }
-
-    // 生成模拟功率数据 (6个电表)
-    for (int i = 0; i < 6; i++) {
-      _powerData[i] = List.generate(20, (j) {
-        return FlSpot(j.toDouble(), 30.0 + i * 10 + (j % 5) * 3.0);
-      });
-    }
-  }
-
-  String _getMeterLabel(int index) => '电表${index + 1}';
-  String _getVibrationLabel(int index) => '水泵${index + 1}';
-  String _getPressureLabel(int index) => '压力${index + 1}';
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Container(
-        color: TechColors.bgDeep,
-        child: const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(color: TechColors.glowCyan),
-              SizedBox(height: 16),
-              Text('加载历史数据...',
-                  style: TextStyle(color: TechColors.textSecondary)),
-            ],
-          ),
-        ),
+  // ==================== 1. 功率数据刷新 ====================
+  Future<void> _refreshPowerData() async {
+    setState(() => _powerLoading = true);
+    try {
+      final response = await _historyService.fetchHistory(
+        pumpId: _powerSelectedPump,
+        parameter: 'power',
+        start: _powerStartTime,
+        end: _powerEndTime,
       );
+      if (mounted) {
+        setState(() {
+          _powerData = _convertToFlSpots(response.data);
+          _powerLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('加载功率数据失败: $e');
+      if (mounted) setState(() => _powerLoading = false);
     }
-
-    return Container(
-      color: TechColors.bgDeep,
-      padding: const EdgeInsets.all(8),
-      child: Column(
-        children: [
-          // 上部分：振动 + 压力 (50%高度)
-          Expanded(
-            flex: 5,
-            child: Row(
-              children: [
-                // 左侧：振动幅值柱状图 + 历史曲线
-                Expanded(
-                  child: _buildVibrationSection(),
-                ),
-                const SizedBox(width: 8),
-                // 右侧：压力柱状图 + 历史曲线
-                Expanded(
-                  child: _buildPressureSection(),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          // 下部分：电表能耗 + 功率 (50%高度)
-          Expanded(
-            flex: 5,
-            child: Row(
-              children: [
-                // 左侧：电表能耗历史曲线
-                Expanded(
-                  child: _buildEnergyChart(),
-                ),
-                const SizedBox(width: 8),
-                // 右侧：电表功率历史曲线
-                Expanded(
-                  child: _buildPowerChart(),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
-  /// 构建振动幅值区域
-  Widget _buildVibrationSection() {
-    return TechPanel(
-      accentColor: TechColors.glowOrange,
-      child: Column(
-        children: [
-          // 标题栏 (无报警设置按钮)
-          _buildSectionHeader(
-            '振动幅值监测',
-            TechColors.glowOrange,
-          ),
-          const SizedBox(height: 8),
-          // 图表
-          Expanded(
-            child: TechBarChart(
-              title: '振动幅值历史曲线',
-              accentColor: TechColors.glowOrange,
-              yAxisLabel: '振动(mm/s)',
-              xAxisLabel: '数据点',
-              xInterval: 5,
-              dataMap: _vibrationData,
-              selectedItems: _selectedVibrations,
-              itemColors: _vibrationColors,
-              itemCount: 6,
-              getItemLabel: _getVibrationLabel,
-              selectorLabel: '选择水泵',
-              highAlarmThreshold: _vibrationHighAlarm,
-              headerActions: [
-                TimeRangeSelector(
-                  startTime: _vibrationChartStartTime,
-                  endTime: _vibrationChartEndTime,
-                  onStartTimeTap: () => _selectChartStartTime('vibration'),
-                  onEndTimeTap: () => _selectChartEndTime('vibration'),
-                  onCancel: () => _refreshChartData('vibration'),
-                  accentColor: TechColors.glowOrange,
-                  compact: true,
-                ),
-              ],
-              onItemToggle: (index) {
-                setState(() {
-                  _selectedVibrations[index] = !_selectedVibrations[index];
-                });
-              },
-            ),
-          ),
-        ],
-      ),
-    );
+  // ==================== 2. 能耗数据刷新 ====================
+  Future<void> _refreshEnergyData() async {
+    setState(() => _energyLoading = true);
+    try {
+      final response = await _historyService.fetchHistory(
+        pumpId: _energySelectedPump,
+        parameter: 'energy',
+        start: _energyStartTime,
+        end: _energyEndTime,
+      );
+      if (mounted) {
+        setState(() {
+          _energyData = _convertToFlSpots(response.data);
+          _energyLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('加载能耗数据失败: $e');
+      if (mounted) setState(() => _energyLoading = false);
+    }
   }
 
-  /// 构建压力区域
-  Widget _buildPressureSection() {
-    return TechPanel(
-      accentColor: TechColors.glowCyan,
-      child: Column(
-        children: [
-          // 标题栏 (无设置按钮，阈值设置移至设置页面)
-          _buildSectionHeader(
-            '压力监测 (1号泵)',
-            TechColors.glowCyan,
-          ),
-          const SizedBox(height: 8),
-          // 图表
-          Expanded(
-            child: TechBarChart(
-              title: '压力历史曲线',
-              accentColor: TechColors.glowCyan,
-              yAxisLabel: '压力(MPa)',
-              xAxisLabel: '数据点',
-              xInterval: 5,
-              dataMap: _pressureData,
-              selectedItems: const [true],
-              itemColors: _pressureColors,
-              itemCount: 1,
-              getItemLabel: _getPressureLabel,
-              selectorLabel: '压力',
-              showSelector: false,
-              highAlarmThreshold: _pressureHighAlarm,
-              lowAlarmThreshold: _pressureLowAlarm,
-              headerActions: [
-                TimeRangeSelector(
-                  startTime: _pressureChartStartTime,
-                  endTime: _pressureChartEndTime,
-                  onStartTimeTap: () => _selectChartStartTime('pressure'),
-                  onEndTimeTap: () => _selectChartEndTime('pressure'),
-                  onCancel: () => _refreshChartData('pressure'),
-                  accentColor: TechColors.glowCyan,
-                  compact: true,
-                ),
-              ],
-              onItemToggle: (index) {},
-            ),
-          ),
-        ],
-      ),
-    );
+  // ==================== 3. 电流数据刷新 ====================
+  Future<void> _refreshCurrentData() async {
+    setState(() => _currentLoading = true);
+    try {
+      final response = await _historyService.fetchHistory(
+        pumpId: _currentSelectedPump,
+        parameter: 'current',
+        start: _currentStartTime,
+        end: _currentEndTime,
+      );
+      if (mounted) {
+        setState(() {
+          _currentData = _convertToFlSpots(response.data);
+          _currentLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('加载电流数据失败: $e');
+      if (mounted) setState(() => _currentLoading = false);
+    }
   }
 
-  /// 构建电表能耗图表
-  Widget _buildEnergyChart() {
-    return TechPanel(
-      accentColor: TechColors.glowGreen,
-      child: TechLineChart(
-        title: '电表能耗历史曲线',
-        accentColor: TechColors.glowGreen,
-        yAxisLabel: '能耗(kWh)',
-        xAxisLabel: '数据点',
-        xInterval: 5,
-        dataMap: _energyData,
-        selectedItems: _selectedMeters,
-        itemColors: _meterColors,
-        itemCount: 6,
-        getItemLabel: _getMeterLabel,
-        selectorLabel: '选择电表',
-        headerActions: [
-          TimeRangeSelector(
-            startTime: _energyChartStartTime,
-            endTime: _energyChartEndTime,
-            onStartTimeTap: () => _selectChartStartTime('energy'),
-            onEndTimeTap: () => _selectChartEndTime('energy'),
-            onCancel: () => _refreshChartData('energy'),
-            accentColor: TechColors.glowGreen,
-            compact: true,
-          ),
-        ],
-        onItemToggle: (index) {
-          setState(() {
-            _selectedMeters[index] = !_selectedMeters[index];
-          });
-        },
-      ),
-    );
+  // ==================== 4. 电压数据刷新 ====================
+  Future<void> _refreshVoltageData() async {
+    setState(() => _voltageLoading = true);
+    try {
+      final response = await _historyService.fetchHistory(
+        pumpId: _voltageSelectedPump,
+        parameter: 'voltage',
+        start: _voltageStartTime,
+        end: _voltageEndTime,
+      );
+      if (mounted) {
+        setState(() {
+          _voltageData = _convertToFlSpots(response.data);
+          _voltageLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('加载电压数据失败: $e');
+      if (mounted) setState(() => _voltageLoading = false);
+    }
   }
 
-  /// 构建电表功率图表
-  Widget _buildPowerChart() {
-    return TechPanel(
-      accentColor: TechColors.glowCyan,
-      child: TechLineChart(
-        title: '电表功率历史曲线',
-        accentColor: TechColors.glowCyan,
-        yAxisLabel: '功率(kW)',
-        xAxisLabel: '数据点',
-        xInterval: 5,
-        dataMap: _powerData,
-        selectedItems: _selectedMeters,
-        itemColors: _meterColors,
-        itemCount: 6,
-        getItemLabel: _getMeterLabel,
-        selectorLabel: '选择电表',
-        headerActions: [
-          TimeRangeSelector(
-            startTime: _powerChartStartTime,
-            endTime: _powerChartEndTime,
-            onStartTimeTap: () => _selectChartStartTime('power'),
-            onEndTimeTap: () => _selectChartEndTime('power'),
-            onCancel: () => _refreshChartData('power'),
-            accentColor: TechColors.glowCyan,
-            compact: true,
-          ),
-        ],
-        onItemToggle: (index) {
-          setState(() {
-            _selectedMeters[index] = !_selectedMeters[index];
-          });
-        },
-      ),
-    );
+  // ==================== 5. 压力数据刷新 ====================
+  Future<void> _refreshPressureData() async {
+    setState(() => _pressureLoading = true);
+    try {
+      final data = await _historyService.fetchPressureHistory(
+        start: _pressureStartTime,
+        end: _pressureEndTime,
+      );
+      if (mounted) {
+        setState(() {
+          _pressureData = _convertToFlSpots(data);
+          _pressureLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('加载压力数据失败: $e');
+      if (mounted) setState(() => _pressureLoading = false);
+    }
   }
 
-  /// 构建区域标题栏
-  Widget _buildSectionHeader(String title, Color color,
-      {VoidCallback? onSettingsTap}) {
-    return Row(
-      children: [
-        Container(
-          width: 3,
-          height: 16,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(2),
-            boxShadow: [
-              BoxShadow(color: color.withOpacity(0.5), blurRadius: 4),
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: TextStyle(
-            color: color,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const Spacer(),
-        if (onSettingsTap != null)
-          GestureDetector(
-            onTap: onSettingsTap,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Icon(Icons.settings, size: 16, color: color),
-            ),
-          ),
-      ],
-    );
+  // ==================== 6. 振动速度数据刷新 ====================
+  Future<void> _refreshVelocityData() async {
+    setState(() => _velocityLoading = true);
+    try {
+      final response = await _historyService.fetchHistory(
+        pumpId: _velocitySelectedPump,
+        parameter: 'vibration_velocity',
+        start: _velocityStartTime,
+        end: _velocityEndTime,
+      );
+      if (mounted) {
+        setState(() {
+          _velocityData = _convertToFlSpots(response.data);
+          _velocityLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('加载振动速度数据失败: $e');
+      if (mounted) setState(() => _velocityLoading = false);
+    }
+  }
+
+  // ==================== 7. 振动位移数据刷新 ====================
+  Future<void> _refreshDisplacementData() async {
+    setState(() => _displacementLoading = true);
+    try {
+      final response = await _historyService.fetchHistory(
+        pumpId: _displacementSelectedPump,
+        parameter: 'vibration_displacement',
+        start: _displacementStartTime,
+        end: _displacementEndTime,
+      );
+      if (mounted) {
+        setState(() {
+          _displacementData = _convertToFlSpots(response.data);
+          _displacementLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('加载振动位移数据失败: $e');
+      if (mounted) setState(() => _displacementLoading = false);
+    }
+  }
+
+  // ==================== 8. 振动频率数据刷新 ====================
+  Future<void> _refreshFrequencyData() async {
+    setState(() => _frequencyLoading = true);
+    try {
+      final response = await _historyService.fetchHistory(
+        pumpId: _frequencySelectedPump,
+        parameter: 'vibration_frequency',
+        start: _frequencyStartTime,
+        end: _frequencyEndTime,
+      );
+      if (mounted) {
+        setState(() {
+          _frequencyData = _convertToFlSpots(response.data);
+          _frequencyLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('加载振动频率数据失败: $e');
+      if (mounted) setState(() => _frequencyLoading = false);
+    }
   }
 
   // ==================== 时间选择方法 ====================
-
-  Future<void> _selectChartStartTime(String chartType) async {
-    final startTime = _getChartStartTime(chartType);
-    final accentColor = _getChartAccentColor(chartType);
+  Future<void> _selectStartTime(String chartType) async {
+    final currentStart = _getStartTime(chartType);
+    final accentColor = _getAccentColor(chartType);
 
     final DateTime? pickedDate = await showDatePicker(
       context: context,
-      initialDate: startTime,
+      initialDate: currentStart,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
       locale: const Locale('zh', 'CN'),
       builder: (context, child) => _buildDatePickerTheme(child, accentColor),
     );
 
-    if (pickedDate != null) {
-      if (!mounted) return;
+    if (pickedDate != null && mounted) {
+      // 只选择小时，不选择分钟
       final TimeOfDay? pickedTime = await showTimePicker(
         context: context,
-        initialTime: TimeOfDay.fromDateTime(startTime),
+        initialTime: TimeOfDay(hour: currentStart.hour, minute: 0),
         builder: (context, child) => _buildTimePickerTheme(child, accentColor),
       );
 
@@ -632,33 +351,33 @@ class HistoryDataPageState extends State<HistoryDataPage> {
             pickedDate.month,
             pickedDate.day,
             pickedTime.hour,
-            pickedTime.minute,
+            0, // 分钟固定为0
           );
-          _setChartStartTime(chartType, newStart);
+          _setStartTime(chartType, newStart);
         });
-        _refreshChartData(chartType);
+        _refreshChart(chartType);
       }
     }
   }
 
-  Future<void> _selectChartEndTime(String chartType) async {
-    final endTime = _getChartEndTime(chartType);
-    final accentColor = _getChartAccentColor(chartType);
+  Future<void> _selectEndTime(String chartType) async {
+    final currentEnd = _getEndTime(chartType);
+    final accentColor = _getAccentColor(chartType);
 
     final DateTime? pickedDate = await showDatePicker(
       context: context,
-      initialDate: endTime,
+      initialDate: currentEnd,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
       locale: const Locale('zh', 'CN'),
       builder: (context, child) => _buildDatePickerTheme(child, accentColor),
     );
 
-    if (pickedDate != null) {
-      if (!mounted) return;
+    if (pickedDate != null && mounted) {
+      // 只选择小时，不选择分钟
       final TimeOfDay? pickedTime = await showTimePicker(
         context: context,
-        initialTime: TimeOfDay.fromDateTime(endTime),
+        initialTime: TimeOfDay(hour: currentEnd.hour, minute: 0),
         builder: (context, child) => _buildTimePickerTheme(child, accentColor),
       );
 
@@ -669,11 +388,11 @@ class HistoryDataPageState extends State<HistoryDataPage> {
             pickedDate.month,
             pickedDate.day,
             pickedTime.hour,
-            pickedTime.minute,
+            0, // 分钟固定为0
           );
-          _setChartEndTime(chartType, newEnd);
+          _setEndTime(chartType, newEnd);
         });
-        _refreshChartData(chartType);
+        _refreshChart(chartType);
       }
     }
   }
@@ -696,257 +415,310 @@ class HistoryDataPageState extends State<HistoryDataPage> {
     );
   }
 
-  Color _getChartAccentColor(String chartType) {
+  DateTime _getStartTime(String chartType) {
     switch (chartType) {
-      case 'vibration':
-        return TechColors.glowOrange;
-      case 'pressure':
-        return TechColors.glowCyan;
-      case 'energy':
-        return TechColors.glowGreen;
-      case 'power':
-        return TechColors.glowCyan;
-      default:
-        return TechColors.glowCyan;
+      case 'power': return _powerStartTime;
+      case 'energy': return _energyStartTime;
+      case 'current': return _currentStartTime;
+      case 'voltage': return _voltageStartTime;
+      case 'pressure': return _pressureStartTime;
+      case 'velocity': return _velocityStartTime;
+      case 'displacement': return _displacementStartTime;
+      case 'frequency': return _frequencyStartTime;
+      default: return DateTime.now().subtract(const Duration(hours: 24));
     }
   }
 
-  DateTime _getChartStartTime(String chartType) {
+  DateTime _getEndTime(String chartType) {
     switch (chartType) {
-      case 'vibration':
-        return _vibrationChartStartTime;
-      case 'pressure':
-        return _pressureChartStartTime;
-      case 'energy':
-        return _energyChartStartTime;
-      case 'power':
-        return _powerChartStartTime;
-      default:
-        return DateTime.now().subtract(const Duration(hours: 1));
+      case 'power': return _powerEndTime;
+      case 'energy': return _energyEndTime;
+      case 'current': return _currentEndTime;
+      case 'voltage': return _voltageEndTime;
+      case 'pressure': return _pressureEndTime;
+      case 'velocity': return _velocityEndTime;
+      case 'displacement': return _displacementEndTime;
+      case 'frequency': return _frequencyEndTime;
+      default: return DateTime.now();
     }
   }
 
-  void _setChartStartTime(String chartType, DateTime time) {
+  void _setStartTime(String chartType, DateTime time) {
     switch (chartType) {
-      case 'vibration':
-        _vibrationChartStartTime = time;
-        break;
-      case 'pressure':
-        _pressureChartStartTime = time;
-        break;
-      case 'energy':
-        _energyChartStartTime = time;
-        break;
-      case 'power':
-        _powerChartStartTime = time;
-        break;
+      case 'power': _powerStartTime = time; break;
+      case 'energy': _energyStartTime = time; break;
+      case 'current': _currentStartTime = time; break;
+      case 'voltage': _voltageStartTime = time; break;
+      case 'pressure': _pressureStartTime = time; break;
+      case 'velocity': _velocityStartTime = time; break;
+      case 'displacement': _displacementStartTime = time; break;
+      case 'frequency': _frequencyStartTime = time; break;
     }
   }
 
-  DateTime _getChartEndTime(String chartType) {
+  void _setEndTime(String chartType, DateTime time) {
     switch (chartType) {
-      case 'vibration':
-        return _vibrationChartEndTime;
-      case 'pressure':
-        return _pressureChartEndTime;
-      case 'energy':
-        return _energyChartEndTime;
-      case 'power':
-        return _powerChartEndTime;
-      default:
-        return DateTime.now();
+      case 'power': _powerEndTime = time; break;
+      case 'energy': _energyEndTime = time; break;
+      case 'current': _currentEndTime = time; break;
+      case 'voltage': _voltageEndTime = time; break;
+      case 'pressure': _pressureEndTime = time; break;
+      case 'velocity': _velocityEndTime = time; break;
+      case 'displacement': _displacementEndTime = time; break;
+      case 'frequency': _frequencyEndTime = time; break;
     }
   }
 
-  void _setChartEndTime(String chartType, DateTime time) {
+  Color _getAccentColor(String chartType) {
     switch (chartType) {
-      case 'vibration':
-        _vibrationChartEndTime = time;
-        break;
-      case 'pressure':
-        _pressureChartEndTime = time;
-        break;
-      case 'energy':
-        _energyChartEndTime = time;
-        break;
-      case 'power':
-        _powerChartEndTime = time;
-        break;
+      case 'power': return TechColors.glowCyan;
+      case 'energy': return TechColors.glowGreen;
+      case 'current': return TechColors.glowOrange;
+      case 'voltage': return const Color(0xFFaf52de);
+      case 'pressure': return TechColors.glowCyan;
+      case 'velocity': return TechColors.glowGreen;
+      case 'displacement': return TechColors.glowOrange;
+      case 'frequency': return const Color(0xFFffcc00);
+      default: return TechColors.glowCyan;
     }
   }
 
-  void _refreshChartData(String chartType) {
-    // 带防抖的刷新
+  void _refreshChart(String chartType) {
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(_debounceDuration, () async {
-      debugPrint('刷新 $chartType 图表数据');
-
-      // 同步阈值配置
-      _syncThresholds();
-
+    _debounceTimer = Timer(_debounceDuration, () {
       switch (chartType) {
-        case 'vibration':
-          // 振动数据暂时使用模拟数据
-          break;
-        case 'pressure':
-          await _refreshPressureData();
-          break;
-        case 'energy':
-          await _refreshEnergyData();
-          break;
-        case 'power':
-          await _refreshPowerData();
-          break;
+        case 'power': _refreshPowerData(); break;
+        case 'energy': _refreshEnergyData(); break;
+        case 'current': _refreshCurrentData(); break;
+        case 'voltage': _refreshVoltageData(); break;
+        case 'pressure': _refreshPressureData(); break;
+        case 'velocity': _refreshVelocityData(); break;
+        case 'displacement': _refreshDisplacementData(); break;
+        case 'frequency': _refreshFrequencyData(); break;
       }
     });
-  }
-}
-
-/// 报警阈值设置对话框
-/// 注意: lowValue/lowLabel/showLow 参数为扩展预留，当前未使用
-// ignore_for_file: unused_element
-class _AlarmSettingsDialog extends StatefulWidget {
-  final String title;
-  final Color accentColor;
-  final double highValue;
-  final double? lowValue; // 预留: 低阈值
-  final String highLabel;
-  final String? lowLabel; // 预留: 低阈值标签
-  final bool showLow; // 预留: 是否显示低阈值
-  final void Function(double high, double? low) onSave;
-
-  const _AlarmSettingsDialog({
-    required this.title,
-    required this.accentColor,
-    required this.highValue,
-    this.lowValue,
-    required this.highLabel,
-    this.lowLabel,
-    this.showLow = false,
-    required this.onSave,
-  });
-
-  @override
-  State<_AlarmSettingsDialog> createState() => _AlarmSettingsDialogState();
-}
-
-class _AlarmSettingsDialogState extends State<_AlarmSettingsDialog> {
-  late TextEditingController _highController;
-  late TextEditingController _lowController;
-
-  @override
-  void initState() {
-    super.initState();
-    _highController = TextEditingController(text: widget.highValue.toString());
-    _lowController =
-        TextEditingController(text: widget.lowValue?.toString() ?? '');
-  }
-
-  @override
-  void dispose() {
-    _highController.dispose();
-    _lowController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: TechColors.bgDark,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: widget.accentColor.withOpacity(0.5)),
-      ),
-      title: Row(
+    return Container(
+      color: TechColors.bgDeep,
+      padding: const EdgeInsets.all(8),
+      child: Column(
         children: [
-          Container(
-            width: 3,
-            height: 18,
-            decoration: BoxDecoration(
-              color: widget.accentColor,
-              borderRadius: BorderRadius.circular(2),
+          // 第一行: 功率 | 能耗 | 电流 | 电压
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(child: _buildPowerChart()),
+                const SizedBox(width: 8),
+                Expanded(child: _buildEnergyChart()),
+                const SizedBox(width: 8),
+                Expanded(child: _buildCurrentChart()),
+                const SizedBox(width: 8),
+                Expanded(child: _buildVoltageChart()),
+              ],
             ),
           ),
-          const SizedBox(width: 8),
-          Text(
-            widget.title,
-            style: TextStyle(color: widget.accentColor, fontSize: 16),
+          const SizedBox(height: 8),
+          // 第二行: 压力 | 速度 | 位移 | 频率
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(child: _buildPressureChart()),
+                const SizedBox(width: 8),
+                Expanded(child: _buildVelocityChart()),
+                const SizedBox(width: 8),
+                Expanded(child: _buildDisplacementChart()),
+                const SizedBox(width: 8),
+                Expanded(child: _buildFrequencyChart()),
+              ],
+            ),
           ),
         ],
       ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildTextField(
-              widget.highLabel, _highController, TechColors.statusAlarm),
-          if (widget.showLow) ...[
-            const SizedBox(height: 16),
-            _buildTextField(
-                widget.lowLabel!, _lowController, TechColors.statusWarning),
-          ],
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text('取消',
-              style: const TextStyle(color: TechColors.textSecondary)),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            final high =
-                double.tryParse(_highController.text) ?? widget.highValue;
-            final low = widget.showLow
-                ? double.tryParse(_lowController.text) ?? widget.lowValue
-                : null;
-            widget.onSave(high, low);
-            Navigator.of(context).pop();
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: widget.accentColor.withOpacity(0.2),
-            foregroundColor: widget.accentColor,
-          ),
-          child: const Text('保存'),
-        ),
-      ],
     );
   }
 
-  Widget _buildTextField(
-      String label, TextEditingController controller, Color labelColor) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(color: labelColor, fontSize: 12),
-        ),
-        const SizedBox(height: 4),
-        TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          style: const TextStyle(color: TechColors.textPrimary),
-          decoration: InputDecoration(
-            isDense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            filled: true,
-            fillColor: TechColors.bgMedium,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(4),
-              borderSide: const BorderSide(color: TechColors.borderDark),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(4),
-              borderSide: const BorderSide(color: TechColors.borderDark),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(4),
-              borderSide: BorderSide(color: labelColor),
-            ),
-          ),
-        ),
-      ],
+  // ==================== 8个图表构建方法 ====================
+
+  Widget _buildPowerChart() {
+    return HistoryChartCard(
+      title: '功率',
+      accentColor: TechColors.glowCyan,
+      yAxisLabel: 'kW',
+      showPumpSelector: true,
+      selectedPump: _powerSelectedPump,
+      onPumpChanged: (pump) {
+        if (pump != null) {
+          setState(() => _powerSelectedPump = pump);
+          _refreshPowerData();
+        }
+      },
+      startTime: _powerStartTime,
+      endTime: _powerEndTime,
+      onStartTimeTap: () => _selectStartTime('power'),
+      onEndTimeTap: () => _selectEndTime('power'),
+      onRefresh: _refreshPowerData,
+      data: _powerData,
+      isLoading: _powerLoading,
+    );
+  }
+
+  Widget _buildEnergyChart() {
+    return HistoryChartCard(
+      title: '能耗',
+      accentColor: TechColors.glowGreen,
+      yAxisLabel: 'kWh',
+      showPumpSelector: true,
+      selectedPump: _energySelectedPump,
+      onPumpChanged: (pump) {
+        if (pump != null) {
+          setState(() => _energySelectedPump = pump);
+          _refreshEnergyData();
+        }
+      },
+      startTime: _energyStartTime,
+      endTime: _energyEndTime,
+      onStartTimeTap: () => _selectStartTime('energy'),
+      onEndTimeTap: () => _selectEndTime('energy'),
+      onRefresh: _refreshEnergyData,
+      data: _energyData,
+      isLoading: _energyLoading,
+    );
+  }
+
+  Widget _buildCurrentChart() {
+    return HistoryChartCard(
+      title: '电流',
+      accentColor: TechColors.glowOrange,
+      yAxisLabel: 'A',
+      showPumpSelector: true,
+      selectedPump: _currentSelectedPump,
+      onPumpChanged: (pump) {
+        if (pump != null) {
+          setState(() => _currentSelectedPump = pump);
+          _refreshCurrentData();
+        }
+      },
+      startTime: _currentStartTime,
+      endTime: _currentEndTime,
+      onStartTimeTap: () => _selectStartTime('current'),
+      onEndTimeTap: () => _selectEndTime('current'),
+      onRefresh: _refreshCurrentData,
+      data: _currentData,
+      isLoading: _currentLoading,
+    );
+  }
+
+  Widget _buildVoltageChart() {
+    return HistoryChartCard(
+      title: '电压',
+      accentColor: const Color(0xFFaf52de),
+      yAxisLabel: 'V',
+      showPumpSelector: true,
+      selectedPump: _voltageSelectedPump,
+      onPumpChanged: (pump) {
+        if (pump != null) {
+          setState(() => _voltageSelectedPump = pump);
+          _refreshVoltageData();
+        }
+      },
+      startTime: _voltageStartTime,
+      endTime: _voltageEndTime,
+      onStartTimeTap: () => _selectStartTime('voltage'),
+      onEndTimeTap: () => _selectEndTime('voltage'),
+      onRefresh: _refreshVoltageData,
+      data: _voltageData,
+      isLoading: _voltageLoading,
+    );
+  }
+
+  Widget _buildPressureChart() {
+    return HistoryChartCard(
+      title: '压力',
+      accentColor: TechColors.glowCyan,
+      yAxisLabel: 'MPa',
+      showPumpSelector: false,
+      selectedPump: 1,
+      startTime: _pressureStartTime,
+      endTime: _pressureEndTime,
+      onStartTimeTap: () => _selectStartTime('pressure'),
+      onEndTimeTap: () => _selectEndTime('pressure'),
+      onRefresh: _refreshPressureData,
+      data: _pressureData,
+      isLoading: _pressureLoading,
+      highAlarmThreshold: 1.0,
+      lowAlarmThreshold: 0.3,
+    );
+  }
+
+  Widget _buildVelocityChart() {
+    return HistoryChartCard(
+      title: '速度',
+      accentColor: TechColors.glowGreen,
+      yAxisLabel: 'mm/s',
+      showPumpSelector: true,
+      selectedPump: _velocitySelectedPump,
+      onPumpChanged: (pump) {
+        if (pump != null) {
+          setState(() => _velocitySelectedPump = pump);
+          _refreshVelocityData();
+        }
+      },
+      startTime: _velocityStartTime,
+      endTime: _velocityEndTime,
+      onStartTimeTap: () => _selectStartTime('velocity'),
+      onEndTimeTap: () => _selectEndTime('velocity'),
+      onRefresh: _refreshVelocityData,
+      data: _velocityData,
+      isLoading: _velocityLoading,
+    );
+  }
+
+  Widget _buildDisplacementChart() {
+    return HistoryChartCard(
+      title: '位移',
+      accentColor: TechColors.glowOrange,
+      yAxisLabel: 'μm',
+      showPumpSelector: true,
+      selectedPump: _displacementSelectedPump,
+      onPumpChanged: (pump) {
+        if (pump != null) {
+          setState(() => _displacementSelectedPump = pump);
+          _refreshDisplacementData();
+        }
+      },
+      startTime: _displacementStartTime,
+      endTime: _displacementEndTime,
+      onStartTimeTap: () => _selectStartTime('displacement'),
+      onEndTimeTap: () => _selectEndTime('displacement'),
+      onRefresh: _refreshDisplacementData,
+      data: _displacementData,
+      isLoading: _displacementLoading,
+    );
+  }
+
+  Widget _buildFrequencyChart() {
+    return HistoryChartCard(
+      title: '频率',
+      accentColor: const Color(0xFFffcc00),
+      yAxisLabel: 'Hz',
+      showPumpSelector: true,
+      selectedPump: _frequencySelectedPump,
+      onPumpChanged: (pump) {
+        if (pump != null) {
+          setState(() => _frequencySelectedPump = pump);
+          _refreshFrequencyData();
+        }
+      },
+      startTime: _frequencyStartTime,
+      endTime: _frequencyEndTime,
+      onStartTimeTap: () => _selectStartTime('frequency'),
+      onEndTimeTap: () => _selectEndTime('frequency'),
+      onRefresh: _refreshFrequencyData,
+      data: _frequencyData,
+      isLoading: _frequencyLoading,
     );
   }
 }

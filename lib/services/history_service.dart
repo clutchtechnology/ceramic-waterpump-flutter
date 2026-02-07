@@ -314,6 +314,86 @@ class HistoryService {
     );
   }
 
+  /// 获取电表电流历史数据 (6个电表)
+  /// interval 为 null 时自动计算最佳聚合间隔
+  Future<Map<int, List<HistoryDataPoint>>> fetchCurrentHistory({
+    required DateTime start,
+    required DateTime end,
+    String? interval,
+  }) async {
+    return fetchMultiplePumpsHistory(
+      pumpIds: [1, 2, 3, 4, 5, 6],
+      parameter: 'current',
+      start: start,
+      end: end,
+      interval: interval,
+    );
+  }
+
+  /// 获取电表电压历史数据 (6个电表)
+  /// interval 为 null 时自动计算最佳聚合间隔
+  Future<Map<int, List<HistoryDataPoint>>> fetchVoltageHistory({
+    required DateTime start,
+    required DateTime end,
+    String? interval,
+  }) async {
+    return fetchMultiplePumpsHistory(
+      pumpIds: [1, 2, 3, 4, 5, 6],
+      parameter: 'voltage',
+      start: start,
+      end: end,
+      interval: interval,
+    );
+  }
+
+  /// 获取振动速度历史数据 (6个水泵)
+  /// interval 为 null 时自动计算最佳聚合间隔
+  Future<Map<int, List<HistoryDataPoint>>> fetchVibrationVelocityHistory({
+    required DateTime start,
+    required DateTime end,
+    String? interval,
+  }) async {
+    return fetchMultiplePumpsHistory(
+      pumpIds: [1, 2, 3, 4, 5, 6],
+      parameter: 'vibration_velocity',
+      start: start,
+      end: end,
+      interval: interval,
+    );
+  }
+
+  /// 获取振动位移历史数据 (6个水泵)
+  /// interval 为 null 时自动计算最佳聚合间隔
+  Future<Map<int, List<HistoryDataPoint>>> fetchVibrationDisplacementHistory({
+    required DateTime start,
+    required DateTime end,
+    String? interval,
+  }) async {
+    return fetchMultiplePumpsHistory(
+      pumpIds: [1, 2, 3, 4, 5, 6],
+      parameter: 'vibration_displacement',
+      start: start,
+      end: end,
+      interval: interval,
+    );
+  }
+
+  /// 获取振动频率历史数据 (6个水泵)
+  /// interval 为 null 时自动计算最佳聚合间隔
+  Future<Map<int, List<HistoryDataPoint>>> fetchVibrationFrequencyHistory({
+    required DateTime start,
+    required DateTime end,
+    String? interval,
+  }) async {
+    return fetchMultiplePumpsHistory(
+      pumpIds: [1, 2, 3, 4, 5, 6],
+      parameter: 'vibration_frequency',
+      start: start,
+      end: end,
+      interval: interval,
+    );
+  }
+
   /// 释放资源 (预留接口，当前 ApiClient 为单例无需释放)
   void dispose() {
     // ApiClient 是单例，由应用退出时统一释放
