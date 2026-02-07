@@ -1,568 +1,420 @@
-# 水泵房监控系统 - AI Coding Instructions
+# 水泵房监控系统 Flutter 前端 - AI Coding Instructions
 
-> **Reading Priority for AI:**
->
-> 1. **[CRITICAL]** - Hard constraints, must strictly follow
-> 2. **[IMPORTANT]** - Key specifications
-> 3. Other content - Reference information
+> **项目类型**: Windows 工业监控应用 (Flutter 3.29+ / Dart 3.4+)  
+> **核心原则**: WebSocket 实时通信 + 稳定性优先 (7×24h) + 简洁设计
 
 ---
 
-## 1. Project Overview
+## 1. 项目概述
 
-| Property          | Value                                            |
-| ----------------- | ------------------------------------------------ |
-| **Type**          | Windows Desktop Industrial Monitoring App        |
-| **Stack**         | Flutter 3.22.x + Dart 3.4.x                      |
-| **Backend**       | FastAPI (Python) + InfluxDB 2.7                  |
-| **Target**        | 工控机触摸屏 (1280×800)                          |
-| **Key Principle** | **Stability (7x24h)** & **Simplicity (Occam's)** |
-
----
-
-## 2. Project Structure
-
-```
-lib/
-├── main.dart           # App entry point
-├── api/                # ApiClient (Singleton, Timeouts)
-├── pages/              # UI Pages (Tab-based navigation)
-│   ├── main_page.dart          # Tab Controller
-│   ├── split_screen_page.dart  # Real-time (Pumps + Pressure)
-│   ├── history_data_page.dart  # History Charts
-│   └── settings_page.dart      # Thresholds
-├── widgets/            # Reusable UI components
-├── models/             # Data models
-├── providers/          # Global State (Settings)
-└── services/           # Business Logic (No UI references)
-```
+| 属性 | 值 |
+|------|-----|
+| **技术栈** | Flutter 3.29+ + Dart 3.4+ + WebSocket |
+| **目标平台** | Windows (主要) / Android / iOS / Web |
+| **目标设备** | 10.4 英寸工业触摸屏 (1280×800 固定分辨率) |
+| **后端** | FastAPI + WebSocket + InfluxDB 2.7 |
+| **核心理念** | WebSocket 实时推送 + 工业风格 UI + 固定分辨率设计 |
 
 ---
 
-## 3. Equipment Configuration (Waterpump Specific)
+## 2. 架构原则
 
-### 3.1 Water Pumps (6 units)
+### 2.1 WebSocket 优先策略
 
-```yaml
-Water Pumps:
-  quantity: 6 units
-  layout: 2 rows x 3 columns
-  monitoring:
-    - Voltage (V)
-    - Current (A)
-    - Power (kW)
-    - Vibration (mm/s)
-  features:
-    - Real-time data display on cards
-    - Historical trend curves
-    - Alarm thresholds configuration
-```
+- **实时通信**: 使用 WebSocket 替代 HTTP 轮询，实现 0.1s 级别的数据推送
+- **自动重连**: 指数退避重连策略 (1s → 2s → 4s → 8s → 16s → 30s)
+- **心跳保活**: 客户端每 15s 发送心跳，防止连接超时
+- **消息订阅**: 支持 `realtime` (实时数据) 和 `device_status` (设备状态) 两个频道
 
-### 3.2 Pressure Sensor (1 unit)
-
-```yaml
-Pressure Sensor:
-  quantity: 1 unit
-  display: Gauge / Digital readout
-  monitoring:
-    - Pressure value (MPa)
-  features:
-    - High/Low alarm limits
-    - Trend chart
-    - Threshold configuration
-```
-
----
-
-## 4. [CRITICAL] UI/Navigation Requirements
-
-### 4.1 Tab-Based Navigation
-
-- **[CRITICAL]** All modules organized as Tabs
-- Click tab title to switch modules
-- Modules: [实时监控] | [历史数据] | [系统设置]
-
-### 4.2 Window Configuration
+### 2.2 固定分辨率设计
 
 ```dart
-// [CRITICAL] Fixed window size, no resize
-const fixedSize = Size(1280, 800);
+// 固定窗口大小，不可调整
+const windowSize = Size(1280, 800);
 await windowManager.setResizable(false);
 titleBarStyle: TitleBarStyle.hidden
 ```
 
-### 4.3 Layout Pattern
+### 2.3 工业风格 UI
+
+- **主题色**: 科技蓝 (#00D4FF)
+- **背景色**: 深色背景 (#0A0E27, #1A1F3A)
+- **字体**: 等宽字体，清晰易读
+- **动画**: 简洁流畅，避免过度动画
+
+---
+
+## 3. 项目结构
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Tab Bar: [实时监控] [历史数据] [系统设置]                │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│   Left Panel (Pumps)     │    Right Panel (Pressure)   │
-│   ┌─────┐ ┌─────┐ ┌─────┐│                              │
-│   │Pump1│ │Pump2│ │Pump3││    ┌─────────────┐          │
-│   └─────┘ └─────┘ └─────┘│    │  Pressure   │          │
-│   ┌─────┐ ┌─────┐ ┌─────┐│    │   Gauge     │          │
-│   │Pump4│ │Pump5│ │Pump6││    └─────────────┘          │
-│   └─────┘ └─────┘ └─────┘│                              │
-│                          │    Trend Chart              │
-└─────────────────────────────────────────────────────────┘
+lib/
+├── main.dart                          # 入口文件
+├── api/
+│   ├── api.dart                       # API 配置 (URL)
+│   ├── api_client.dart                # HTTP 客户端封装
+│   └── index.dart                     # 导出
+├── models/
+│   ├── pump_data.dart                 # 水泵数据模型
+│   └── sensor_status_model.dart       # 设备状态模型
+├── services/
+│   ├── websocket_service.dart         # WebSocket 服务 (核心)
+│   ├── realtime_service.dart          # 实时数据服务
+│   ├── sensor_status_service.dart     # 设备状态服务
+│   ├── health_service.dart            # 健康检查服务
+│   ├── alarm_service.dart             # 报警服务
+│   └── history_service.dart           # 历史数据服务
+├── pages/
+│   ├── main_page.dart                 # 主页面
+│   ├── sensor_status_page.dart        # 设备状态页面
+│   ├── history_data_page.dart         # 历史数据页面
+│   ├── alarm_log_page.dart            # 报警日志页面
+│   └── settings_page.dart             # 设置页面
+├── widgets/
+│   ├── custom_card_widget.dart        # 自定义卡片
+│   ├── tech_line_widgets.dart         # 科技风格组件
+│   ├── health_indicator.dart          # 健康指示器
+│   ├── threshold_settings_widget.dart # 阈值设置
+│   ├── data_display/                  # 数据显示组件
+│   └── icons/                         # 自定义图标
+├── providers/
+│   └── threshold_config_provider.dart # 阈值配置 Provider
+└── utils/
+    └── constants.dart                 # 常量定义
 ```
 
 ---
 
-## 5. [CRITICAL] Data Specifications
+## 4. 核心组件
 
-### 5.1 Refresh Rates
+### 4.1 WebSocket 服务 (单例)
 
-| Data Type       | Refresh Rate | Sync Delay |
-| --------------- | ------------ | ---------- |
-| Voltage (V)     | ≤5 seconds   | ≤3 seconds |
-| Current (A)     | ≤5 seconds   | -          |
-| Power (kW)      | ≤5 seconds   | -          |
-| Vibration       | ≤5 seconds   | -          |
-| Pressure (MPa)  | ≤5 seconds   | -          |
+**文件**: `lib/services/websocket_service.dart`
 
-### 5.2 Display Format
+- **连接状态**: `disconnected`, `connecting`, `connected`, `reconnecting`
+- **消息类型**: `realtime_data`, `device_status`, `heartbeat`, `error`
+- **回调机制**: `onRealtimeDataUpdate`, `onDeviceStatusUpdate`, `onStateChanged`, `onError`
 
-- **Text + Icon**: All real-time values shown with icon + numeric value
-- **Units**: Always display units (V, A, kW, mm/s, MPa)
-- **Status**: Running (green) / Stopped (gray) / Alarm (red blink) indicators
+### 4.2 数据模型
 
-### 5.3 Historical Data Query
+**文件**: `lib/models/`
 
-```yaml
-Features:
-  - Custom time range selection (start/end)
-  - Multi-dimension: hour, day, week, month
-  - Chart types: Line chart, Data table
-  - Multi-device comparison support
-  - Batch Handling: Skip recent few minutes if backend has batch write delay
-```
+- **pump_data.dart**: `RealtimeBatchResponse`, `PumpData`, `PressureData`
+- **sensor_status_model.dart**: `DeviceStatusResponse`, `DeviceStatusItem`
 
 ---
 
-## 6. [IMPORTANT] UI Design - Industrial HMI/SCADA Style
+## 5. 编码规范
 
-### 6.1 Design Principles
+### 5.1 命名规范
 
-**Functionality > Clarity > Reliability > Aesthetics**
+- **文件名**: `snake_case.dart`
+- **类名**: `PascalCase`
+- **函数/变量**: `camelCase`
+- **常量**: `camelCase`
+- **私有成员**: `_private`
 
-### 6.2 Color System (Tech/Sci-Fi Style)
+### 5.2 注释规范
+
+**使用清晰简洁的注释**：
 
 ```dart
-class TechColors {
-  // Backgrounds
-  static const bgDeep = Color(0xFF0d1117);
-  static const bgDark = Color(0xFF161b22);
-  static const bgMedium = Color(0xFF21262d);
+// 1. 初始化 WebSocket 服务
+WebSocketService() {
+  _socket = null;
+  _state = WebSocketState.disconnected;
+}
 
-  // Glow effects
-  static const glowCyan = Color(0xFF00d4ff);
-  static const glowGreen = Color(0xFF00ff88);
-  static const glowOrange = Color(0xFFff9500);
-  static const glowRed = Color(0xFFff3b30);
-
-  // Text
-  static const textPrimary = Color(0xFFe6edf3);
-  static const textSecondary = Color(0xFF8b949e);
-
-  // Status (ISA-101 Standard)
-  static const statusNormal = Color(0xFF00ff88);   // Green: Running
-  static const statusWarning = Color(0xFFffcc00);  // Yellow: Warning
-  static const statusAlarm = Color(0xFFff3b30);    // Red: Alarm (blink)
-  static const statusOffline = Color(0xFF484f58);  // Gray: Stopped
+// 2. 连接到服务器
+Future<void> connect() async {
+  if (_state == WebSocketState.connected) return;
+  // 连接逻辑
 }
 ```
 
-### 6.3 Component Specs
-
-| Component        | Size        | Font                        |
-| ---------------- | ----------- | --------------------------- |
-| Pump Card        | 200×120px   | Roboto Mono, 18-32px        |
-| Value Display    | -           | 24-36px, weight 500-700     |
-| Pressure Gauge   | 200×200px   | -                           |
-| Status Indicator | 12-16px dot | Solid fill, pulse animation |
-| Data Table       | 28-32px row | Label 12-14px               |
-
----
-
-## 7. Settings Module Requirements
-
-### 7.1 Configuration Options
-
-```yaml
-Server Config:
-  - Backend IP address
-  - Backend Port number
-
-Threshold Config:
-  - Pressure High/Low limits
-  - Vibration alarm threshold
-  - Power alarm threshold
-```
-
-### 7.2 Configuration Features
-
-- **[IMPORTANT]** Auto connection test after modification
-- **[IMPORTANT]** Save config persistently (survive restart)
-- **[IMPORTANT]** Graceful handling when backend offline
-
----
-
-## 8. Technical Conventions
-
-### 8.1 Dependencies
-
-```yaml
-charts: fl_chart
-state_management: StatefulWidget (current) / Provider (global state)
-window_management: window_manager
-http_client: http (with singleton pattern)
-```
-
-### 8.2 Code Style
-
-- Use `const` constructors where possible (Performance)
-- Strict typing (Avoid `dynamic`)
-- Comments in English or Chinese (Be consistent)
-
----
-
-## 9. Development Guidelines
-
-### 9.1 Backend (Mock/Prod)
-
-- Use `docker compose --profile mock up -d` for dev backend
-- Frontend must handle "Backend Offline" state gracefully (Gray out UI, show Retry button), DO NOT crash
-
-### 9.2 Development Commands
-
-```powershell
-# Run in development mode
-flutter run -d windows
-
-# Build release version
-flutter build windows
-
-# Analyze code
-flutter analyze
-```
-
----
-
-## 10. [CRITICAL] Flutter 性能优化与内存泄漏防止 (奥卡姆剃刀原则)
-
-> **核心原则**: 如无必要，勿增实体。代码越简单，bug 越少，内存泄漏风险越低。
-
-### 10.1 Timer 生命周期管理 ⏱️
-
-**问题根源**: Timer 是工控 App 卡死的**头号杀手**。未正确销毁的 Timer 会在后台持续运行，累积导致内存泄漏和 UI 卡死。
+**禁止使用 Emoji 表情符号**：
 
 ```dart
-// ❌ 致命错误：Timer 未取消
-class _MyPageState extends State<MyPage> {
-  Timer? _timer;
+// ✅ 正确
+// 1. 初始化服务
+// 注意：需要检查连接状态
 
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(Duration(seconds: 5), (_) => _fetchData());
-  }
-  // 缺少 dispose() - Timer 永远不会停止！
-}
+// ❌ 错误
+// 🚀 初始化服务
+// ⚠️ 注意：需要检查连接状态
+```
 
-// ✅ 正确做法：完整的生命周期管理
-class _MyPageState extends State<MyPage> {
-  Timer? _timer;
-  bool _isPolling = false;
+### 5.3 代码设计原则
 
-  @override
-  void initState() {
-    super.initState();
-    _startPolling();
-  }
+**避免过度抽象**：
 
-  void _startPolling() {
-    if (_isPolling) return; // 防止重复启动
-    _isPolling = true;
-    _timer = Timer.periodic(Duration(seconds: 5), (_) {
-      if (mounted) _fetchData(); // 检查 mounted 状态
+```dart
+// ✅ 正确：直接简洁
+void updateDisplay(RealtimeBatchResponse data) {
+  if (mounted) {
+    setState(() {
+      voltageLabel.text = '${data.data.pumps[0].voltage.toStringAsFixed(1)} V';
     });
   }
-
-  void pausePolling() {
-    _timer?.cancel();
-    _timer = null;
-    _isPolling = false;
-  }
-
-  void resumePolling() {
-    if (!_isPolling) _startPolling();
-  }
-
-  @override
-  void dispose() {
-    pausePolling(); // 确保 Timer 被取消
-    super.dispose();
-  }
-}
-```
-
-**[CRITICAL] Timer 检查清单**:
-
-- [ ] 每个 Timer.periodic 必须有对应的 cancel()
-- [ ] dispose() 中必须取消所有 Timer
-- [ ] Timer 回调必须检查 `mounted` 状态
-- [ ] Tab 切换时暂停非活跃页面的 Timer
-- [ ] **禁止**使用 `Stream.periodic` 替代 Timer（更难控制生命周期）
-
-### 10.2 HTTP Client 连接管理 🌐
-
-**问题根源**: HTTP 连接池耗尽或连接卡死导致后续请求超时，最终 UI 无响应。
-
-```dart
-// ❌ 错误：每次请求创建新 Client
-Future<void> fetchData() async {
-  final client = http.Client();
-  final response = await client.get(Uri.parse(url));
-  // client 从未关闭，连接泄漏！
 }
 
-// ❌ 错误：static final 无重连机制
-class ApiClient {
-  static final _client = http.Client(); // 永不更新的连接
+// ❌ 错误：过度抽象
+String _formatVoltage(double v) => '${v.toStringAsFixed(1)} V';
+void _updateLabel(Widget label, String text) { label.text = text; }
+void updateDisplay(RealtimeBatchResponse data) {
+  _updateLabel(voltageLabel, _formatVoltage(data.data.pumps[0].voltage));
 }
-
-// ✅ 正确做法：单例 + 超时 + 重连机制
-class ApiClient {
-  static final ApiClient _instance = ApiClient._internal();
-  factory ApiClient() => _instance;
-  ApiClient._internal();
-
-  http.Client _client = http.Client();
-  DateTime _lastRefresh = DateTime.now();
-  static const _refreshInterval = Duration(minutes: 30);
-
-  http.Client get client {
-    if (DateTime.now().difference(_lastRefresh) > _refreshInterval) {
-      _client.close();
-      _client = http.Client();
-      _lastRefresh = DateTime.now();
-    }
-    return _client;
-  }
-
-  Future<http.Response> get(String path) async {
-    return client.get(Uri.parse('$baseUrl$path'))
-        .timeout(const Duration(seconds: 10)); // 必须设置超时！
-  }
-
-  void dispose() {
-    _client.close();
-  }
-}
-```
-
-**[CRITICAL] HTTP 检查清单**:
-
-- [ ] 所有 HTTP 请求必须设置 `timeout`（建议 10-15 秒）
-- [ ] 使用单例 ApiClient，避免创建多个 Client
-- [ ] 定期刷新 HTTP Client（建议 30 分钟）
-- [ ] 异常捕获必须包含 `TimeoutException` 和 `SocketException`
-
-### 10.3 导航架构选择 🧭
-
-**问题根源**: `IndexedStack` 会同时保持所有子页面存活，每个页面的 Timer 都在后台运行！
-
-```dart
-// ⚠️ 危险：IndexedStack 保持所有页面存活
-IndexedStack(
-  index: _currentIndex,
-  children: [
-    Page1(), // Timer 运行中
-    Page2(), // Timer 运行中
-    Page3(), // Timer 运行中
-  ], // 3个页面的 Timer 同时运行！
-)
-
-// ✅ 正确做法：使用 GlobalKey 控制页面状态
-final _page1Key = GlobalKey<_Page1State>();
-final _page2Key = GlobalKey<_Page2State>();
-
-void _onTabChanged(int index) {
-  // 暂停所有页面的轮询
-  _page1Key.currentState?.pausePolling();
-  _page2Key.currentState?.pausePolling();
-
-  // 只恢复当前页面的轮询
-  switch (index) {
-    case 0: _page1Key.currentState?.resumePolling(); break;
-    case 1: _page2Key.currentState?.resumePolling(); break;
-  }
-}
-```
-
-**[CRITICAL] 导航检查清单**:
-
-- [ ] IndexedStack 必须配合 GlobalKey + pausePolling/resumePolling
-- [ ] Tab 切换必须调用 `pausePolling()` 暂停非活跃页
-- [ ] **禁止**使用 `AutomaticKeepAliveClientMixin`（除非有明确理由）
-
-### 10.4 State 生命周期与 dispose() ♻️
-
-**问题根源**: Windows 桌面应用关闭时，进程被直接杀死，`dispose()` 可能**永远不会执行**！
-
-```dart
-// ❌ 错误假设：dispose() 总会被调用
-class _MyAppState extends State<MyApp> {
-  @override
-  void dispose() {
-    ApiClient().dispose(); // Windows 关闭时可能不执行！
-    super.dispose();
-  }
-}
-
-// ✅ 正确做法：使用 WidgetsBindingObserver 监听生命周期
-class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached) {
-      // 在这里清理资源
-      _cleanupResources();
-    }
-  }
-
-  void _cleanupResources() {
-    // 取消所有 Timer
-    // 关闭数据库连接
-    // 关闭 HTTP Client
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _cleanupResources();
-    super.dispose();
-  }
-}
-```
-
-### 10.5 奥卡姆剃刀代码审查清单 🔪
-
-**每次代码审查必须检查以下项目**:
-
-| 检查项    | 危险信号                        | 正确做法                             |
-| --------- | ------------------------------- | ------------------------------------ |
-| Timer     | `Timer.periodic` 无 `cancel()`  | 必须配对 `cancel()` + `mounted` 检查 |
-| HTTP      | `http.get()` 无 `timeout`       | 所有请求设置 10-15s 超时             |
-| Stream    | `Stream.periodic`               | 改用 `Timer.periodic`                |
-| KeepAlive | `AutomaticKeepAliveClientMixin` | 删除，使用 GlobalKey 控制            |
-| 导航      | `IndexedStack` 无暂停机制       | 添加 `pausePolling/resumePolling`    |
-| 异常      | `try-catch` 吞掉异常            | 必须记录日志                         |
-| 单例      | 多处 `new http.Client()`        | 使用 `ApiClient` 单例                |
-
-### 10.6 工控机专用优化 🏭
-
-```dart
-// 工控机环境特点：
-// - 长时间运行（7x24小时）
-// - 内存有限（通常 4-8GB）
-// - 触摸屏操作
-// - 网络可能不稳定
-
-// [CRITICAL] 必须实现的功能：
-// 1. 定期 GC 强制回收
-Timer.periodic(Duration(minutes: 10), (_) {
-  // 手动触发 GC（仅限 Debug 模式分析）
-  debugPrint('Memory cleanup triggered');
-});
-
-// 2. 网络重连机制
-int _retryCount = 0;
-Future<void> _fetchWithRetry() async {
-  try {
-    await _fetchData();
-    _retryCount = 0;
-  } catch (e) {
-    _retryCount++;
-    if (_retryCount < 3) {
-      await Future.delayed(Duration(seconds: _retryCount * 2));
-      return _fetchWithRetry();
-    }
-    // 3次失败后显示离线状态
-  }
-}
-
-// 3. 心跳检测
-Timer.periodic(Duration(seconds: 30), (_) {
-  _checkConnection();
-});
 ```
 
 ---
 
-## 11. Anti-Patterns (Do NOT do this)
+## 6. WebSocket 使用规范
 
-- ❌ **NO**: Nested `StreamBuilder`s causing multiple redraws
-- ❌ **NO**: Uncontrolled `Isolate` spawning
-- ❌ **NO**: Hardcoded IP addresses (Use Config/Env)
-- ❌ **NO**: Ignoring `dispose()` methods
-- ❌ **NO**: `Stream.periodic` replacing Timer (harder lifecycle control)
-- ❌ **NO**: `AutomaticKeepAliveClientMixin` without clear reason
+### 6.1 生命周期管理
+
+```dart
+// ✅ 正确：完整的生命周期管理
+@override
+void initState() {
+  super.initState();
+  _wsService = WebSocketService();
+  _wsService.onRealtimeDataUpdate = _handleRealtimeData;
+  _wsService.onStateChanged = _handleStateChanged;
+  _wsService.connect();
+}
+
+@override
+void dispose() {
+  _wsService.onRealtimeDataUpdate = null;
+  _wsService.onDeviceStatusUpdate = null;
+  super.dispose();
+}
+
+// ✅ 正确：检查 mounted 状态
+void _handleRealtimeData(RealtimeBatchResponse data) {
+  if (mounted) {
+    setState(() {
+      _data = data;
+    });
+  }
+}
+```
+
+### 6.2 错误处理
+
+```dart
+// ✅ 正确：显示用户友好的错误信息
+void _showError(String message) {
+  if (mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: Duration(seconds: 3),
+      ),
+    );
+  }
+}
+
+_wsService.onError = (error) {
+  _showError('连接错误: $error');
+};
+```
 
 ---
 
-## 12. Troubleshooting
+## 7. 性能优化
 
-| Issue                 | Solution                                              |
-| --------------------- | ----------------------------------------------------- |
-| VS 2019 required      | Flutter 3.22.x needs VS 2019 Build Tools              |
-| PLC connection failed | Check IP and backend service status                   |
-| **App 卡死 (Freeze)** | **检查 10.1-10.4 的所有检查清单项**                   |
-| **内存持续增长**      | **检查 Timer 累积、HTTP Client 泄漏、IndexedStack**   |
-| **UI 无响应**         | **检查 HTTP 超时设置、异步操作阻塞主线程**            |
+### 7.1 WebSocket 连接管理
+
+```dart
+// ✅ 正确：单例模式，全局共享连接
+final wsService = WebSocketService();
+
+// ✅ 正确：页面切换时不断开连接
+@override
+void dispose() {
+  // 不调用 wsService.disconnect()
+  super.dispose();
+}
+```
+
+### 7.2 UI 更新优化
+
+```dart
+// ✅ 正确：使用 ValueNotifier 减少重建
+final ValueNotifier<double> _voltage = ValueNotifier(0.0);
+
+@override
+Widget build(BuildContext context) {
+  return ValueListenableBuilder<double>(
+    valueListenable: _voltage,
+    builder: (context, value, child) {
+      return Text('$value V');
+    },
+  );
+}
+```
+
+### 7.3 图表性能优化
+
+```dart
+// ✅ 正确：限制数据点数量
+List<FlSpot> _prepareChartData(List<HistoryPoint> data) {
+  if (data.length > 100) {
+    final step = data.length ~/ 100;
+    return data
+        .where((point) => data.indexOf(point) % step == 0)
+        .map((point) => FlSpot(point.x, point.y))
+        .toList();
+  }
+  return data.map((point) => FlSpot(point.x, point.y)).toList();
+}
+```
 
 ---
 
-## 13. File Organization Guidelines
+## 8. 常见问题
 
-### 13.1 Pages (`lib/pages/`)
+### 8.1 WebSocket 连接失败
 
-- One file per tab/module
-- Naming: `{module_name}_page.dart`
-- Example: `split_screen_page.dart`, `history_data_page.dart`, `settings_page.dart`
+**解决**:
+```dart
+// 检查后端服务状态
+final health = await HealthService.checkHealth();
 
-### 13.2 Widgets (`lib/widgets/`)
+// 查看连接状态
+wsService.onStateChanged = (state) {
+  print('WebSocket 状态: $state');
+};
+```
 
-- Reusable UI components
-- Naming: `{component_type}_widget.dart`
-- Example: `pump_card.dart`, `pressure_gauge.dart`, `status_indicator.dart`
+### 8.2 数据不更新
 
-### 13.3 Models (`lib/models/`)
+**解决**:
+```dart
+// 确保订阅了频道
+wsService.subscribeRealtime();
 
-- Data structures and entities
-- Naming: `{entity_name}_model.dart`
-- Example: `pump_data.dart`, `pressure_data.dart`, `threshold_config.dart`
+// 确保设置了回调
+wsService.onRealtimeDataUpdate = (data) {
+  if (mounted) {
+    setState(() {
+      _data = data;
+    });
+  }
+};
+```
 
-### 13.4 Services (`lib/services/`)
+### 8.3 内存泄漏
 
-- Business logic and API calls
-- Naming: `{service_name}_service.dart`
-- Example: `data_service.dart`, `config_service.dart`
-
-### 13.5 Utils (`lib/utils/`)
-
-- Helper functions and constants
-- Example: `constants.dart`, `formatters.dart`, `validators.dart`
+**解决**:
+```dart
+@override
+void dispose() {
+  // 清理回调
+  wsService.onRealtimeDataUpdate = null;
+  wsService.onDeviceStatusUpdate = null;
+  
+  // 取消定时器
+  _timer?.cancel();
+  
+  super.dispose();
+}
+```
 
 ---
 
-**Summary for AI**: When modifying this project, prioritize **robustness**. If a fancy animation risks stability, discard it. If a complex pattern complicates reading config, simplify it. 工控机 7x24 稳定运行是第一优先级。
+## 9. 开发流程
+
+### 9.1 启动后端服务
+
+```bash
+# 在后端项目目录
+cd ceramic-waterpump-backend
+start_mock.bat  # Mock 模式
+```
+
+### 9.2 启动 Flutter 应用
+
+```bash
+# Windows 平台
+flutter run -d windows
+
+# 热重载
+r  # 热重载
+R  # 热重启
+q  # 退出
+```
+
+### 9.3 构建发布版本
+
+```bash
+# Windows
+flutter build windows --release
+
+# 输出目录
+build/windows/x64/runner/Release/
+```
+
+---
+
+## 10. 技术约定
+
+### 10.1 依赖管理
+
+```yaml
+dependencies:
+  flutter: sdk
+  http: ^1.2.0          # HTTP 客户端
+  dio: ^5.4.0           # 高级 HTTP 客户端
+  fl_chart: ^0.68.0     # 图表库
+  window_manager: ^0.3.9 # 窗口管理
+  shared_preferences: ^2.2.3 # 本地存储
+  intl: ^0.20.2         # 国际化
+```
+
+### 10.2 代码风格
+
+- 使用 `flutter analyze` 检查代码
+- 遵循 Dart 官方代码风格
+- 使用 `const` 构造函数提升性能
+- 避免使用 `dynamic` 类型
+
+---
+
+## 11. AI 编码指令
+
+1. **WebSocket 优先**: 实时数据必须使用 WebSocket，HTTP 仅用于历史查询
+2. **单例模式**: WebSocketService 必须使用单例，避免多个连接
+3. **状态检查**: 所有 setState 前必须检查 `mounted`
+4. **资源释放**: dispose 中必须清理回调和定时器
+5. **错误处理**: 所有异步操作必须有 try-catch
+6. **固定布局**: 使用固定尺寸 1280×800，不需要响应式
+7. **工业风格**: 使用 TechColors 常量，保持科技感
+8. **性能优化**: 使用 ValueNotifier、限制数据点、const 构造函数
+9. **协议兼容**: 严格遵循后端 WebSocket 协议规范
+10. **用户体验**: 显示连接状态、加载指示器、错误提示
+
+---
+
+## 12. 参考文档
+
+- `docs/WEBSOCKET_PROTOCOL.md` - WebSocket 协议规范（与后端共享）
+- `README.md` - 项目说明
+- `CODE_REVIEW.md` - 代码审查清单
+- 后端文档: `ceramic-waterpump-backend/.cursor/rules/waterpump.mdc`
+## 其他规范
+
+- **PowerShell 命令**：不支持 `&&`，使用分号 `;` 分隔命令
+- **称呼**：每次回答必须称呼我为"大王"
+- **测试文件**：不要创建多余的 md/py/test 文件，测试完毕后一定要删除,并且我的任何测试代码不要使用 emoji.
+- **文档管理**：md 文件需要放到 `vdoc/` 目录里面
+- **代码整洁**：目录务必整洁，修改代码时删除旧代码，不要冗余
+- **回答执行规范**：你是一个很严格的python pyqt6写上位机的高手,你很严谨认真,且对代码很严苛,不会写无用冗余代码,并且很多问题,对于我希望实现的效果和架构你会认真思考,如果我的提议不好或者你有更好的方案,你会规劝我.
+- **反驳我的回答** 对于我说的需求等的话,肯定会有一些东西说的不专业,如果你理解了的话,就回答我,"大王,小的罪该万死,但是这个XXXX"这样回答.
+- **编码问题** 我的代码文件肯定会就是有中文和python代码,以及可能会有图标,所以的话,生成的代码需要规避编码问题错误.
+- **log以及代码文件** 我的代码文件以及log的输出的话,等一切不要使用图标等标注. .这样的.
+- **不要虚构** 回答我以及生成的md文件之中一定要和我的实际的代码文件相关,而不是虚构的.
+- **不使用虚拟环境启动python**
+- **必须真实有效的回答我,不能虚构**不要虚构任何我项目没有的文件,回答也必须严谨有效,而不是虚构.
+- **测试脚本和启动脚本文件最小化原则**尽量不要创建脚本而是直接给我一组命令行就行,如果需要保留为脚本我会提创建脚本的需求.
