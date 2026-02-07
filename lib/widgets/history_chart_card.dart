@@ -122,7 +122,7 @@ class HistoryChartCard extends StatelessWidget {
           title,
           style: TextStyle(
             color: accentColor,
-            fontSize: 11,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -159,14 +159,14 @@ class HistoryChartCard extends StatelessWidget {
         child: DropdownButton<int>(
           value: selectedPump,
           isDense: true,
-          style: TextStyle(color: accentColor, fontSize: 10),
+          style: TextStyle(color: accentColor, fontSize: 14),
           dropdownColor: TechColors.bgDark,
-          icon: Icon(Icons.arrow_drop_down, color: accentColor, size: 14),
+          icon: Icon(Icons.arrow_drop_down, color: accentColor, size: 16),
           items: List.generate(6, (i) {
             final pumpId = i + 1;
             return DropdownMenuItem(
               value: pumpId,
-              child: Text('泵$pumpId', style: const TextStyle(fontSize: 10)),
+              child: Text('泵$pumpId', style: const TextStyle(fontSize: 14)),
             );
           }),
           onChanged: (value) {
@@ -187,7 +187,7 @@ class HistoryChartCard extends StatelessWidget {
         _buildTimeButton(dateFormat.format(startTime), onStartTimeTap),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 3),
-          child: Text('-', style: TextStyle(color: accentColor, fontSize: 10)),
+          child: Text('-', style: TextStyle(color: accentColor, fontSize: 14)),
         ),
         _buildTimeButton(dateFormat.format(endTime), onEndTimeTap),
       ],
@@ -209,7 +209,7 @@ class HistoryChartCard extends StatelessWidget {
         child: Center(
           child: Text(
             text,
-            style: TextStyle(color: accentColor, fontSize: 9),
+            style: TextStyle(color: accentColor, fontSize: 14),
           ),
         ),
       ),
@@ -228,7 +228,7 @@ class HistoryChartCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(3),
           border: Border.all(color: accentColor.withOpacity(0.3)),
         ),
-        child: Icon(Icons.refresh, color: accentColor, size: 12),
+        child: Icon(Icons.refresh, color: accentColor, size: 14),
       ),
     );
   }
