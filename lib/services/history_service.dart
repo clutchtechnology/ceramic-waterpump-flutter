@@ -291,7 +291,7 @@ class HistoryService {
   }) async {
     return fetchMultiplePumpsHistory(
       pumpIds: [1, 2, 3, 4, 5, 6],
-      parameter: 'power', // 使用功率作为能耗
+      parameter: 'Pt', // 使用功率作为能耗
       start: start,
       end: end,
       interval: interval,
@@ -307,11 +307,75 @@ class HistoryService {
   }) async {
     return fetchMultiplePumpsHistory(
       pumpIds: [1, 2, 3, 4, 5, 6],
-      parameter: 'power',
+      parameter: 'Pt',
       start: start,
       end: end,
       interval: interval,
     );
+  }
+
+  /// 获取三相电流历史数据 (单个水泵)
+  /// 返回 Map: {'A': [数据点], 'B': [数据点], 'C': [数据点]}
+  Future<Map<String, List<HistoryDataPoint>>> fetchThreePhaseCurrentHistory({
+    required int pumpId,
+    required DateTime start,
+    required DateTime end,
+    String? interval,
+  }) async {
+    final results = <String, List<HistoryDataPoint>>{};
+
+    // 并行查询三相电流
+    final futures = ['I_0', 'I_1', 'I_2'].map((param) async {
+      final response = await fetchHistory(
+        pumpId: pumpId,
+        parameter: param,
+        start: start,
+        end: end,
+        interval: interval,
+      );
+      // I_0->A, I_1->B, I_2->C
+      final phaseMap = {'I_0': 'A', 'I_1': 'B', 'I_2': 'C'};
+      return MapEntry(phaseMap[param]!, response.data);
+    });
+
+    final entries = await Future.wait(futures);
+    for (final entry in entries) {
+      results[entry.key] = entry.value;
+    }
+
+    return results;
+  }
+
+  /// 获取三相电压历史数据 (单个水泵)
+  /// 返回 Map: {'A': [数据点], 'B': [数据点], 'C': [数据点]}
+  Future<Map<String, List<HistoryDataPoint>>> fetchThreePhaseVoltageHistory({
+    required int pumpId,
+    required DateTime start,
+    required DateTime end,
+    String? interval,
+  }) async {
+    final results = <String, List<HistoryDataPoint>>{};
+
+    // 并行查询三相电压
+    final futures = ['Ua_0', 'Ua_1', 'Ua_2'].map((param) async {
+      final response = await fetchHistory(
+        pumpId: pumpId,
+        parameter: param,
+        start: start,
+        end: end,
+        interval: interval,
+      );
+      // Ua_0->A, Ua_1->B, Ua_2->C
+      final phaseMap = {'Ua_0': 'A', 'Ua_1': 'B', 'Ua_2': 'C'};
+      return MapEntry(phaseMap[param]!, response.data);
+    });
+
+    final entries = await Future.wait(futures);
+    for (final entry in entries) {
+      results[entry.key] = entry.value;
+    }
+
+    return results;
   }
 
   /// 获取电表电流历史数据 (6个电表)
@@ -323,7 +387,7 @@ class HistoryService {
   }) async {
     return fetchMultiplePumpsHistory(
       pumpIds: [1, 2, 3, 4, 5, 6],
-      parameter: 'current',
+      parameter: 'I_0',
       start: start,
       end: end,
       interval: interval,
@@ -339,11 +403,108 @@ class HistoryService {
   }) async {
     return fetchMultiplePumpsHistory(
       pumpIds: [1, 2, 3, 4, 5, 6],
-      parameter: 'voltage',
+      parameter: 'Ua_0',
       start: start,
       end: end,
       interval: interval,
     );
+  }
+
+  /// 获取三轴振动速度历史数据 (单个水泵)
+  /// 返回 Map: {'X': [数据点], 'Y': [数据点], 'Z': [数据点]}
+  Future<Map<String, List<HistoryDataPoint>>> fetchThreeAxisVelocityHistory({
+    required int pumpId,
+    required DateTime start,
+    required DateTime end,
+    String? interval,
+  }) async {
+    final results = <String, List<HistoryDataPoint>>{};
+
+    // 并行查询三轴速度
+    final futures = ['vib_velocity_x', 'vib_velocity_y', 'vib_velocity_z']
+        .map((param) async {
+      final response = await fetchHistory(
+        pumpId: pumpId,
+        parameter: param,
+        start: start,
+        end: end,
+        interval: interval,
+      );
+      return MapEntry(param.split('_').last.toUpperCase(), response.data);
+    });
+
+    final entries = await Future.wait(futures);
+    for (final entry in entries) {
+      results[entry.key] = entry.value;
+    }
+
+    return results;
+  }
+
+  /// 获取三轴振动位移历史数据 (单个水泵)
+  /// 返回 Map: {'X': [数据点], 'Y': [数据点], 'Z': [数据点]}
+  Future<Map<String, List<HistoryDataPoint>>>
+      fetchThreeAxisDisplacementHistory({
+    required int pumpId,
+    required DateTime start,
+    required DateTime end,
+    String? interval,
+  }) async {
+    final results = <String, List<HistoryDataPoint>>{};
+
+    // 并行查询三轴位移
+    final futures = [
+      'vib_displacement_x',
+      'vib_displacement_y',
+      'vib_displacement_z'
+    ].map((param) async {
+      final response = await fetchHistory(
+        pumpId: pumpId,
+        parameter: param,
+        start: start,
+        end: end,
+        interval: interval,
+      );
+      return MapEntry(param.split('_').last.toUpperCase(), response.data);
+    });
+
+    final entries = await Future.wait(futures);
+    for (final entry in entries) {
+      results[entry.key] = entry.value;
+    }
+
+    return results;
+  }
+
+  /// 获取三轴振动频率历史数据 (单个水泵)
+  /// 返回 Map: {'X': [数据点], 'Y': [数据点], 'Z': [数据点]}
+  Future<Map<String, List<HistoryDataPoint>>> fetchThreeAxisFrequencyHistory({
+    required int pumpId,
+    required DateTime start,
+    required DateTime end,
+    String? interval,
+  }) async {
+    final results = <String, List<HistoryDataPoint>>{};
+
+    // 并行查询三轴频率
+    final futures = ['vib_frequency_x', 'vib_frequency_y', 'vib_frequency_z']
+        .map((param) async {
+      final response = await fetchHistory(
+        pumpId: pumpId,
+        parameter: param,
+        start: start,
+        end: end,
+        interval: interval,
+      );
+      return MapEntry(param.split('_').last.toUpperCase(), response.data);
+    });
+
+    final entries = await Future.wait(futures);
+    for (final entry in entries) {
+      results[entry.key] = entry.value;
+    }
+
+    return results;
   }
 
   /// 获取振动速度历史数据 (6个水泵)

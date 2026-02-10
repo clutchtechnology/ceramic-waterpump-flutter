@@ -45,18 +45,18 @@ class HistoryDataPageState extends State<HistoryDataPage> {
   List<FlSpot> _energyData = [];
   bool _energyLoading = false;
 
-  // 3. 电流
+  // 3. 电流 (三相)
   int _currentSelectedPump = 1;
   late DateTime _currentStartTime;
   late DateTime _currentEndTime;
-  List<FlSpot> _currentData = [];
+  Map<String, List<FlSpot>> _currentData = {};
   bool _currentLoading = false;
 
-  // 4. 电压
+  // 4. 电压 (三相)
   int _voltageSelectedPump = 1;
   late DateTime _voltageStartTime;
   late DateTime _voltageEndTime;
-  List<FlSpot> _voltageData = [];
+  Map<String, List<FlSpot>> _voltageData = {};
   bool _voltageLoading = false;
 
   // 5. 压力 (无水泵选择)
@@ -65,25 +65,25 @@ class HistoryDataPageState extends State<HistoryDataPage> {
   List<FlSpot> _pressureData = [];
   bool _pressureLoading = false;
 
-  // 6. 振动速度
+  // 6. 振动速度 (三轴)
   int _velocitySelectedPump = 1;
   late DateTime _velocityStartTime;
   late DateTime _velocityEndTime;
-  List<FlSpot> _velocityData = [];
+  Map<String, List<FlSpot>> _velocityData = {};
   bool _velocityLoading = false;
 
-  // 7. 振动位移
+  // 7. 振动位移 (三轴)
   int _displacementSelectedPump = 1;
   late DateTime _displacementStartTime;
   late DateTime _displacementEndTime;
-  List<FlSpot> _displacementData = [];
+  Map<String, List<FlSpot>> _displacementData = {};
   bool _displacementLoading = false;
 
-  // 8. 振动频率
+  // 8. 振动频率 (三轴)
   int _frequencySelectedPump = 1;
   late DateTime _frequencyStartTime;
   late DateTime _frequencyEndTime;
-  List<FlSpot> _frequencyData = [];
+  Map<String, List<FlSpot>> _frequencyData = {};
   bool _frequencyLoading = false;
 
   @override
@@ -148,13 +148,23 @@ class HistoryDataPageState extends State<HistoryDataPage> {
     }).toList();
   }
 
+  /// 转换三相/三轴历史数据为FlSpot Map
+  Map<String, List<FlSpot>> _convertToMultiLineFlSpots(
+      Map<String, List<HistoryDataPoint>> data) {
+    final result = <String, List<FlSpot>>{};
+    for (final entry in data.entries) {
+      result[entry.key] = _convertToFlSpots(entry.value);
+    }
+    return result;
+  }
+
   // ==================== 1. 功率数据刷新 ====================
   Future<void> _refreshPowerData() async {
     setState(() => _powerLoading = true);
     try {
       final response = await _historyService.fetchHistory(
         pumpId: _powerSelectedPump,
-        parameter: 'power',
+        parameter: 'Pt',
         start: _powerStartTime,
         end: _powerEndTime,
       );
@@ -176,7 +186,7 @@ class HistoryDataPageState extends State<HistoryDataPage> {
     try {
       final response = await _historyService.fetchHistory(
         pumpId: _energySelectedPump,
-        parameter: 'energy',
+        parameter: 'ImpEp',
         start: _energyStartTime,
         end: _energyEndTime,
       );
@@ -192,19 +202,18 @@ class HistoryDataPageState extends State<HistoryDataPage> {
     }
   }
 
-  // ==================== 3. 电流数据刷新 ====================
+  // ==================== 3. 电流数据刷新 (三相) ====================
   Future<void> _refreshCurrentData() async {
     setState(() => _currentLoading = true);
     try {
-      final response = await _historyService.fetchHistory(
+      final response = await _historyService.fetchThreePhaseCurrentHistory(
         pumpId: _currentSelectedPump,
-        parameter: 'current',
         start: _currentStartTime,
         end: _currentEndTime,
       );
       if (mounted) {
         setState(() {
-          _currentData = _convertToFlSpots(response.data);
+          _currentData = _convertToMultiLineFlSpots(response);
           _currentLoading = false;
         });
       }
@@ -214,19 +223,18 @@ class HistoryDataPageState extends State<HistoryDataPage> {
     }
   }
 
-  // ==================== 4. 电压数据刷新 ====================
+  // ==================== 4. 电压数据刷新 (三相) ====================
   Future<void> _refreshVoltageData() async {
     setState(() => _voltageLoading = true);
     try {
-      final response = await _historyService.fetchHistory(
+      final response = await _historyService.fetchThreePhaseVoltageHistory(
         pumpId: _voltageSelectedPump,
-        parameter: 'voltage',
         start: _voltageStartTime,
         end: _voltageEndTime,
       );
       if (mounted) {
         setState(() {
-          _voltageData = _convertToFlSpots(response.data);
+          _voltageData = _convertToMultiLineFlSpots(response);
           _voltageLoading = false;
         });
       }
@@ -256,19 +264,18 @@ class HistoryDataPageState extends State<HistoryDataPage> {
     }
   }
 
-  // ==================== 6. 振动速度数据刷新 ====================
+  // ==================== 6. 振动速度数据刷新 (三轴) ====================
   Future<void> _refreshVelocityData() async {
     setState(() => _velocityLoading = true);
     try {
-      final response = await _historyService.fetchHistory(
+      final response = await _historyService.fetchThreeAxisVelocityHistory(
         pumpId: _velocitySelectedPump,
-        parameter: 'vibration_velocity',
         start: _velocityStartTime,
         end: _velocityEndTime,
       );
       if (mounted) {
         setState(() {
-          _velocityData = _convertToFlSpots(response.data);
+          _velocityData = _convertToMultiLineFlSpots(response);
           _velocityLoading = false;
         });
       }
@@ -278,19 +285,18 @@ class HistoryDataPageState extends State<HistoryDataPage> {
     }
   }
 
-  // ==================== 7. 振动位移数据刷新 ====================
+  // ==================== 7. 振动位移数据刷新 (三轴) ====================
   Future<void> _refreshDisplacementData() async {
     setState(() => _displacementLoading = true);
     try {
-      final response = await _historyService.fetchHistory(
+      final response = await _historyService.fetchThreeAxisDisplacementHistory(
         pumpId: _displacementSelectedPump,
-        parameter: 'vibration_displacement',
         start: _displacementStartTime,
         end: _displacementEndTime,
       );
       if (mounted) {
         setState(() {
-          _displacementData = _convertToFlSpots(response.data);
+          _displacementData = _convertToMultiLineFlSpots(response);
           _displacementLoading = false;
         });
       }
@@ -300,19 +306,18 @@ class HistoryDataPageState extends State<HistoryDataPage> {
     }
   }
 
-  // ==================== 8. 振动频率数据刷新 ====================
+  // ==================== 8. 振动频率数据刷新 (三轴) ====================
   Future<void> _refreshFrequencyData() async {
     setState(() => _frequencyLoading = true);
     try {
-      final response = await _historyService.fetchHistory(
+      final response = await _historyService.fetchThreeAxisFrequencyHistory(
         pumpId: _frequencySelectedPump,
-        parameter: 'vibration_frequency',
         start: _frequencyStartTime,
         end: _frequencyEndTime,
       );
       if (mounted) {
         setState(() {
-          _frequencyData = _convertToFlSpots(response.data);
+          _frequencyData = _convertToMultiLineFlSpots(response);
           _frequencyLoading = false;
         });
       }
@@ -401,6 +406,20 @@ class HistoryDataPageState extends State<HistoryDataPage> {
     return Theme(
       data: ThemeData.dark().copyWith(
         colorScheme: ColorScheme.dark(primary: accentColor),
+        dialogTheme: DialogThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            minimumSize: const Size(80, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ),
       ),
       child: child!,
     );
@@ -410,6 +429,20 @@ class HistoryDataPageState extends State<HistoryDataPage> {
     return Theme(
       data: ThemeData.dark().copyWith(
         colorScheme: ColorScheme.dark(primary: accentColor),
+        dialogTheme: DialogThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            minimumSize: const Size(80, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ),
       ),
       child: child!,
     );
@@ -417,84 +450,141 @@ class HistoryDataPageState extends State<HistoryDataPage> {
 
   DateTime _getStartTime(String chartType) {
     switch (chartType) {
-      case 'power': return _powerStartTime;
-      case 'energy': return _energyStartTime;
-      case 'current': return _currentStartTime;
-      case 'voltage': return _voltageStartTime;
-      case 'pressure': return _pressureStartTime;
-      case 'velocity': return _velocityStartTime;
-      case 'displacement': return _displacementStartTime;
-      case 'frequency': return _frequencyStartTime;
-      default: return DateTime.now().subtract(const Duration(hours: 24));
+      case 'power':
+        return _powerStartTime;
+      case 'energy':
+        return _energyStartTime;
+      case 'current':
+        return _currentStartTime;
+      case 'voltage':
+        return _voltageStartTime;
+      case 'pressure':
+        return _pressureStartTime;
+      case 'velocity':
+        return _velocityStartTime;
+      case 'displacement':
+        return _displacementStartTime;
+      case 'frequency':
+        return _frequencyStartTime;
+      default:
+        return DateTime.now().subtract(const Duration(hours: 24));
     }
   }
 
   DateTime _getEndTime(String chartType) {
     switch (chartType) {
-      case 'power': return _powerEndTime;
-      case 'energy': return _energyEndTime;
-      case 'current': return _currentEndTime;
-      case 'voltage': return _voltageEndTime;
-      case 'pressure': return _pressureEndTime;
-      case 'velocity': return _velocityEndTime;
-      case 'displacement': return _displacementEndTime;
-      case 'frequency': return _frequencyEndTime;
-      default: return DateTime.now();
+      case 'power':
+        return _powerEndTime;
+      case 'energy':
+        return _energyEndTime;
+      case 'current':
+        return _currentEndTime;
+      case 'voltage':
+        return _voltageEndTime;
+      case 'pressure':
+        return _pressureEndTime;
+      case 'velocity':
+        return _velocityEndTime;
+      case 'displacement':
+        return _displacementEndTime;
+      case 'frequency':
+        return _frequencyEndTime;
+      default:
+        return DateTime.now();
     }
   }
 
   void _setStartTime(String chartType, DateTime time) {
     switch (chartType) {
-      case 'power': _powerStartTime = time; break;
-      case 'energy': _energyStartTime = time; break;
-      case 'current': _currentStartTime = time; break;
-      case 'voltage': _voltageStartTime = time; break;
-      case 'pressure': _pressureStartTime = time; break;
-      case 'velocity': _velocityStartTime = time; break;
-      case 'displacement': _displacementStartTime = time; break;
-      case 'frequency': _frequencyStartTime = time; break;
+      case 'power':
+        _powerStartTime = time;
+        break;
+      case 'energy':
+        _energyStartTime = time;
+        break;
+      case 'current':
+        _currentStartTime = time;
+        break;
+      case 'voltage':
+        _voltageStartTime = time;
+        break;
+      case 'pressure':
+        _pressureStartTime = time;
+        break;
+      case 'velocity':
+        _velocityStartTime = time;
+        break;
+      case 'displacement':
+        _displacementStartTime = time;
+        break;
+      case 'frequency':
+        _frequencyStartTime = time;
+        break;
     }
   }
 
   void _setEndTime(String chartType, DateTime time) {
     switch (chartType) {
-      case 'power': _powerEndTime = time; break;
-      case 'energy': _energyEndTime = time; break;
-      case 'current': _currentEndTime = time; break;
-      case 'voltage': _voltageEndTime = time; break;
-      case 'pressure': _pressureEndTime = time; break;
-      case 'velocity': _velocityEndTime = time; break;
-      case 'displacement': _displacementEndTime = time; break;
-      case 'frequency': _frequencyEndTime = time; break;
+      case 'power':
+        _powerEndTime = time;
+        break;
+      case 'energy':
+        _energyEndTime = time;
+        break;
+      case 'current':
+        _currentEndTime = time;
+        break;
+      case 'voltage':
+        _voltageEndTime = time;
+        break;
+      case 'pressure':
+        _pressureEndTime = time;
+        break;
+      case 'velocity':
+        _velocityEndTime = time;
+        break;
+      case 'displacement':
+        _displacementEndTime = time;
+        break;
+      case 'frequency':
+        _frequencyEndTime = time;
+        break;
     }
   }
 
   Color _getAccentColor(String chartType) {
-    switch (chartType) {
-      case 'power': return TechColors.glowCyan;
-      case 'energy': return TechColors.glowGreen;
-      case 'current': return TechColors.glowOrange;
-      case 'voltage': return const Color(0xFFaf52de);
-      case 'pressure': return TechColors.glowCyan;
-      case 'velocity': return TechColors.glowGreen;
-      case 'displacement': return TechColors.glowOrange;
-      case 'frequency': return const Color(0xFFffcc00);
-      default: return TechColors.glowCyan;
-    }
+    // 所有图表统一使用青色
+    return TechColors.glowCyan;
   }
 
   void _refreshChart(String chartType) {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(_debounceDuration, () {
       switch (chartType) {
-        case 'power': _refreshPowerData(); break;
-        case 'energy': _refreshEnergyData(); break;
-        case 'current': _refreshCurrentData(); break;
-        case 'voltage': _refreshVoltageData(); break;
-        case 'pressure': _refreshPressureData(); break;
-        case 'velocity': _refreshVelocityData(); break;
-        case 'displacement': _refreshDisplacementData(); break;
-        case 'frequency': _refreshFrequencyData(); break;
+        case 'power':
+          _refreshPowerData();
+          break;
+        case 'energy':
+          _refreshEnergyData();
+          break;
+        case 'current':
+          _refreshCurrentData();
+          break;
+        case 'voltage':
+          _refreshVoltageData();
+          break;
+        case 'pressure':
+          _refreshPressureData();
+          break;
+        case 'velocity':
+          _refreshVelocityData();
+          break;
+        case 'displacement':
+          _refreshDisplacementData();
+          break;
+        case 'frequency':
+          _refreshFrequencyData();
+          break;
       }
     });
   }
@@ -568,7 +658,7 @@ class HistoryDataPageState extends State<HistoryDataPage> {
   Widget _buildEnergyChart() {
     return HistoryChartCard(
       title: '能耗',
-      accentColor: TechColors.glowGreen,
+      accentColor: TechColors.glowCyan,
       yAxisLabel: 'kWh',
       showPumpSelector: true,
       selectedPump: _energySelectedPump,
@@ -591,7 +681,7 @@ class HistoryDataPageState extends State<HistoryDataPage> {
   Widget _buildCurrentChart() {
     return HistoryChartCard(
       title: '电流',
-      accentColor: TechColors.glowOrange,
+      accentColor: TechColors.glowCyan,
       yAxisLabel: 'A',
       showPumpSelector: true,
       selectedPump: _currentSelectedPump,
@@ -606,7 +696,7 @@ class HistoryDataPageState extends State<HistoryDataPage> {
       onStartTimeTap: () => _selectStartTime('current'),
       onEndTimeTap: () => _selectEndTime('current'),
       onRefresh: _refreshCurrentData,
-      data: _currentData,
+      multiLineData: _currentData,
       isLoading: _currentLoading,
     );
   }
@@ -614,7 +704,7 @@ class HistoryDataPageState extends State<HistoryDataPage> {
   Widget _buildVoltageChart() {
     return HistoryChartCard(
       title: '电压',
-      accentColor: const Color(0xFFaf52de),
+      accentColor: TechColors.glowCyan,
       yAxisLabel: 'V',
       showPumpSelector: true,
       selectedPump: _voltageSelectedPump,
@@ -629,7 +719,7 @@ class HistoryDataPageState extends State<HistoryDataPage> {
       onStartTimeTap: () => _selectStartTime('voltage'),
       onEndTimeTap: () => _selectEndTime('voltage'),
       onRefresh: _refreshVoltageData,
-      data: _voltageData,
+      multiLineData: _voltageData,
       isLoading: _voltageLoading,
     );
   }
@@ -656,7 +746,7 @@ class HistoryDataPageState extends State<HistoryDataPage> {
   Widget _buildVelocityChart() {
     return HistoryChartCard(
       title: '速度',
-      accentColor: TechColors.glowGreen,
+      accentColor: TechColors.glowCyan,
       yAxisLabel: 'mm/s',
       showPumpSelector: true,
       selectedPump: _velocitySelectedPump,
@@ -671,7 +761,7 @@ class HistoryDataPageState extends State<HistoryDataPage> {
       onStartTimeTap: () => _selectStartTime('velocity'),
       onEndTimeTap: () => _selectEndTime('velocity'),
       onRefresh: _refreshVelocityData,
-      data: _velocityData,
+      multiLineData: _velocityData,
       isLoading: _velocityLoading,
     );
   }
@@ -679,7 +769,7 @@ class HistoryDataPageState extends State<HistoryDataPage> {
   Widget _buildDisplacementChart() {
     return HistoryChartCard(
       title: '位移',
-      accentColor: TechColors.glowOrange,
+      accentColor: TechColors.glowCyan,
       yAxisLabel: 'μm',
       showPumpSelector: true,
       selectedPump: _displacementSelectedPump,
@@ -694,7 +784,7 @@ class HistoryDataPageState extends State<HistoryDataPage> {
       onStartTimeTap: () => _selectStartTime('displacement'),
       onEndTimeTap: () => _selectEndTime('displacement'),
       onRefresh: _refreshDisplacementData,
-      data: _displacementData,
+      multiLineData: _displacementData,
       isLoading: _displacementLoading,
     );
   }
@@ -702,7 +792,7 @@ class HistoryDataPageState extends State<HistoryDataPage> {
   Widget _buildFrequencyChart() {
     return HistoryChartCard(
       title: '频率',
-      accentColor: const Color(0xFFffcc00),
+      accentColor: TechColors.glowCyan,
       yAxisLabel: 'Hz',
       showPumpSelector: true,
       selectedPump: _frequencySelectedPump,
@@ -717,7 +807,7 @@ class HistoryDataPageState extends State<HistoryDataPage> {
       onStartTimeTap: () => _selectStartTime('frequency'),
       onEndTimeTap: () => _selectEndTime('frequency'),
       onRefresh: _refreshFrequencyData,
-      data: _frequencyData,
+      multiLineData: _frequencyData,
       isLoading: _frequencyLoading,
     );
   }

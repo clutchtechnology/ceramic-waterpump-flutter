@@ -78,127 +78,273 @@ class ThresholdConfig {
 ///
 /// 包含：
 /// - 电流阈值 (6个水泵)
-/// - 功率阈值 (6个水泵)
-/// - 压力阈值 (1号水泵，高低双阈值)
-/// - 振动幅度阈值 (6个水泵)
+/// - 电压阈值 (6个水泵)
+/// - 水压阈值 (高低双阈值)
+/// - 速度阈值 (6个水泵)
+/// - 位移阈值 (6个水泵)
+/// - 频率阈值 (6个水泵)
 class ThresholdConfigProvider extends ChangeNotifier {
-  static const String _storageKey = 'waterpump_threshold_config_v1';
+  static const String _storageKey = 'waterpump_threshold_config_v3';
 
   bool _isLoaded = false;
   bool get isLoaded => _isLoaded;
 
   // ============================================================
-  // 电流阈值配置 (6个水泵)
+  // 电流阈值配置 I (6个水泵)
   // ============================================================
-  final List<ThresholdConfig> currentConfigs = [
+  final List<ThresholdConfig> iConfigs = [
     ThresholdConfig(
-        key: 'pump_1_current',
+        key: 'pump_1_I',
         displayName: '1号泵电流',
         normalMax: 50.0,
         warningMax: 80.0),
     ThresholdConfig(
-        key: 'pump_2_current',
+        key: 'pump_2_I',
         displayName: '2号泵电流',
         normalMax: 50.0,
         warningMax: 80.0),
     ThresholdConfig(
-        key: 'pump_3_current',
+        key: 'pump_3_I',
         displayName: '3号泵电流',
         normalMax: 50.0,
         warningMax: 80.0),
     ThresholdConfig(
-        key: 'pump_4_current',
+        key: 'pump_4_I',
         displayName: '4号泵电流',
         normalMax: 50.0,
         warningMax: 80.0),
     ThresholdConfig(
-        key: 'pump_5_current',
+        key: 'pump_5_I',
         displayName: '5号泵电流',
         normalMax: 50.0,
         warningMax: 80.0),
     ThresholdConfig(
-        key: 'pump_6_current',
+        key: 'pump_6_I',
         displayName: '6号泵电流',
         normalMax: 50.0,
         warningMax: 80.0),
   ];
 
   // ============================================================
-  // 功率阈值配置 (6个水泵)
+  // 电压阈值配置 Ua (6个水泵)
   // ============================================================
-  final List<ThresholdConfig> powerConfigs = [
+  final List<ThresholdConfig> uaConfigs = [
     ThresholdConfig(
-        key: 'pump_1_power',
-        displayName: '1号泵功率',
-        normalMax: 30.0,
-        warningMax: 50.0),
+        key: 'pump_1_Ua',
+        displayName: '1号泵电压',
+        normalMax: 400.0,
+        warningMax: 420.0),
     ThresholdConfig(
-        key: 'pump_2_power',
-        displayName: '2号泵功率',
-        normalMax: 30.0,
-        warningMax: 50.0),
+        key: 'pump_2_Ua',
+        displayName: '2号泵电压',
+        normalMax: 400.0,
+        warningMax: 420.0),
     ThresholdConfig(
-        key: 'pump_3_power',
-        displayName: '3号泵功率',
-        normalMax: 30.0,
-        warningMax: 50.0),
+        key: 'pump_3_Ua',
+        displayName: '3号泵电压',
+        normalMax: 400.0,
+        warningMax: 420.0),
     ThresholdConfig(
-        key: 'pump_4_power',
-        displayName: '4号泵功率',
-        normalMax: 30.0,
-        warningMax: 50.0),
+        key: 'pump_4_Ua',
+        displayName: '4号泵电压',
+        normalMax: 400.0,
+        warningMax: 420.0),
     ThresholdConfig(
-        key: 'pump_5_power',
-        displayName: '5号泵功率',
-        normalMax: 30.0,
-        warningMax: 50.0),
+        key: 'pump_5_Ua',
+        displayName: '5号泵电压',
+        normalMax: 400.0,
+        warningMax: 420.0),
     ThresholdConfig(
-        key: 'pump_6_power',
-        displayName: '6号泵功率',
-        normalMax: 30.0,
-        warningMax: 50.0),
+        key: 'pump_6_Ua',
+        displayName: '6号泵电压',
+        normalMax: 400.0,
+        warningMax: 420.0),
   ];
 
   // ============================================================
-  // 压力阈值配置 (1号水泵，高低双阈值)
+  // 水压阈值配置 (高低双阈值)
   // ============================================================
   double pressureHighAlarm = 1.0; // 高压报警阈值 (MPa)
   double pressureLowAlarm = 0.3; // 低压报警阈值 (MPa)
 
   // ============================================================
-  // 振动幅度阈值配置 (6个水泵)
+  // 速度阈值配置 (6个水泵)
+  // ============================================================
+  final List<ThresholdConfig> speedConfigs = [
+    ThresholdConfig(
+        key: 'pump_1_speed',
+        displayName: '1号泵速度',
+        normalMax: 1450.0,
+        warningMax: 1500.0),
+    ThresholdConfig(
+        key: 'pump_2_speed',
+        displayName: '2号泵速度',
+        normalMax: 1450.0,
+        warningMax: 1500.0),
+    ThresholdConfig(
+        key: 'pump_3_speed',
+        displayName: '3号泵速度',
+        normalMax: 1450.0,
+        warningMax: 1500.0),
+    ThresholdConfig(
+        key: 'pump_4_speed',
+        displayName: '4号泵速度',
+        normalMax: 1450.0,
+        warningMax: 1500.0),
+    ThresholdConfig(
+        key: 'pump_5_speed',
+        displayName: '5号泵速度',
+        normalMax: 1450.0,
+        warningMax: 1500.0),
+    ThresholdConfig(
+        key: 'pump_6_speed',
+        displayName: '6号泵速度',
+        normalMax: 1450.0,
+        warningMax: 1500.0),
+  ];
+
+  // ============================================================
+  // 位移阈值配置 (6个水泵)
+  // ============================================================
+  final List<ThresholdConfig> displacementConfigs = [
+    ThresholdConfig(
+        key: 'pump_1_displacement',
+        displayName: '1号泵位移',
+        normalMax: 0.5,
+        warningMax: 1.0),
+    ThresholdConfig(
+        key: 'pump_2_displacement',
+        displayName: '2号泵位移',
+        normalMax: 0.5,
+        warningMax: 1.0),
+    ThresholdConfig(
+        key: 'pump_3_displacement',
+        displayName: '3号泵位移',
+        normalMax: 0.5,
+        warningMax: 1.0),
+    ThresholdConfig(
+        key: 'pump_4_displacement',
+        displayName: '4号泵位移',
+        normalMax: 0.5,
+        warningMax: 1.0),
+    ThresholdConfig(
+        key: 'pump_5_displacement',
+        displayName: '5号泵位移',
+        normalMax: 0.5,
+        warningMax: 1.0),
+    ThresholdConfig(
+        key: 'pump_6_displacement',
+        displayName: '6号泵位移',
+        normalMax: 0.5,
+        warningMax: 1.0),
+  ];
+
+  // ============================================================
+  // 频率阈值配置 (6个水泵)
+  // ============================================================
+  final List<ThresholdConfig> frequencyConfigs = [
+    ThresholdConfig(
+        key: 'pump_1_frequency',
+        displayName: '1号泵频率',
+        normalMax: 50.0,
+        warningMax: 52.0),
+    ThresholdConfig(
+        key: 'pump_2_frequency',
+        displayName: '2号泵频率',
+        normalMax: 50.0,
+        warningMax: 52.0),
+    ThresholdConfig(
+        key: 'pump_3_frequency',
+        displayName: '3号泵频率',
+        normalMax: 50.0,
+        warningMax: 52.0),
+    ThresholdConfig(
+        key: 'pump_4_frequency',
+        displayName: '4号泵频率',
+        normalMax: 50.0,
+        warningMax: 52.0),
+    ThresholdConfig(
+        key: 'pump_5_frequency',
+        displayName: '5号泵频率',
+        normalMax: 50.0,
+        warningMax: 52.0),
+    ThresholdConfig(
+        key: 'pump_6_frequency',
+        displayName: '6号泵频率',
+        normalMax: 50.0,
+        warningMax: 52.0),
+  ];
+
+  // ============================================================
+  // 功率阈值配置 Pt (6个水泵)
+  // ============================================================
+  final List<ThresholdConfig> ptConfigs = [
+    ThresholdConfig(
+        key: 'pump_1_Pt',
+        displayName: '1号泵功率',
+        normalMax: 10.0,
+        warningMax: 15.0),
+    ThresholdConfig(
+        key: 'pump_2_Pt',
+        displayName: '2号泵功率',
+        normalMax: 10.0,
+        warningMax: 15.0),
+    ThresholdConfig(
+        key: 'pump_3_Pt',
+        displayName: '3号泵功率',
+        normalMax: 10.0,
+        warningMax: 15.0),
+    ThresholdConfig(
+        key: 'pump_4_Pt',
+        displayName: '4号泵功率',
+        normalMax: 10.0,
+        warningMax: 15.0),
+    ThresholdConfig(
+        key: 'pump_5_Pt',
+        displayName: '5号泵功率',
+        normalMax: 10.0,
+        warningMax: 15.0),
+    ThresholdConfig(
+        key: 'pump_6_Pt',
+        displayName: '6号泵功率',
+        normalMax: 10.0,
+        warningMax: 15.0),
+  ];
+
+  // ============================================================
+  // 振动阈值配置 (6个水泵)
   // ============================================================
   final List<ThresholdConfig> vibrationConfigs = [
     ThresholdConfig(
         key: 'pump_1_vibration',
         displayName: '1号泵振动',
-        normalMax: 1.0,
-        warningMax: 1.5),
+        normalMax: 5.0,
+        warningMax: 10.0),
     ThresholdConfig(
         key: 'pump_2_vibration',
         displayName: '2号泵振动',
-        normalMax: 1.0,
-        warningMax: 1.5),
+        normalMax: 5.0,
+        warningMax: 10.0),
     ThresholdConfig(
         key: 'pump_3_vibration',
         displayName: '3号泵振动',
-        normalMax: 1.0,
-        warningMax: 1.5),
+        normalMax: 5.0,
+        warningMax: 10.0),
     ThresholdConfig(
         key: 'pump_4_vibration',
         displayName: '4号泵振动',
-        normalMax: 1.0,
-        warningMax: 1.5),
+        normalMax: 5.0,
+        warningMax: 10.0),
     ThresholdConfig(
         key: 'pump_5_vibration',
         displayName: '5号泵振动',
-        normalMax: 1.0,
-        warningMax: 1.5),
+        normalMax: 5.0,
+        warningMax: 10.0),
     ThresholdConfig(
         key: 'pump_6_vibration',
         displayName: '6号泵振动',
-        normalMax: 1.0,
-        warningMax: 1.5),
+        normalMax: 5.0,
+        warningMax: 10.0),
   ];
 
   /// 从本地存储加载配置
@@ -222,9 +368,9 @@ class ThresholdConfigProvider extends ChangeNotifier {
 
   void _loadFromJson(Map<String, dynamic> json) {
     // 加载电流配置
-    if (json['current'] != null) {
-      final data = json['current'] as Map<String, dynamic>;
-      for (var config in currentConfigs) {
+    if (json['I'] != null) {
+      final data = json['I'] as Map<String, dynamic>;
+      for (var config in iConfigs) {
         if (data[config.key] != null) {
           final item = data[config.key] as Map<String, dynamic>;
           config.normalMax =
@@ -235,10 +381,10 @@ class ThresholdConfigProvider extends ChangeNotifier {
       }
     }
 
-    // 加载功率配置
-    if (json['power'] != null) {
-      final data = json['power'] as Map<String, dynamic>;
-      for (var config in powerConfigs) {
+    // 加载电压配置
+    if (json['Ua'] != null) {
+      final data = json['Ua'] as Map<String, dynamic>;
+      for (var config in uaConfigs) {
         if (data[config.key] != null) {
           final item = data[config.key] as Map<String, dynamic>;
           config.normalMax =
@@ -255,6 +401,62 @@ class ThresholdConfigProvider extends ChangeNotifier {
       pressureHighAlarm =
           (data['high'] as num?)?.toDouble() ?? pressureHighAlarm;
       pressureLowAlarm = (data['low'] as num?)?.toDouble() ?? pressureLowAlarm;
+    }
+
+    // 加载速度配置
+    if (json['speed'] != null) {
+      final data = json['speed'] as Map<String, dynamic>;
+      for (var config in speedConfigs) {
+        if (data[config.key] != null) {
+          final item = data[config.key] as Map<String, dynamic>;
+          config.normalMax =
+              (item['normalMax'] as num?)?.toDouble() ?? config.normalMax;
+          config.warningMax =
+              (item['warningMax'] as num?)?.toDouble() ?? config.warningMax;
+        }
+      }
+    }
+
+    // 加载位移配置
+    if (json['displacement'] != null) {
+      final data = json['displacement'] as Map<String, dynamic>;
+      for (var config in displacementConfigs) {
+        if (data[config.key] != null) {
+          final item = data[config.key] as Map<String, dynamic>;
+          config.normalMax =
+              (item['normalMax'] as num?)?.toDouble() ?? config.normalMax;
+          config.warningMax =
+              (item['warningMax'] as num?)?.toDouble() ?? config.warningMax;
+        }
+      }
+    }
+
+    // 加载频率配置
+    if (json['frequency'] != null) {
+      final data = json['frequency'] as Map<String, dynamic>;
+      for (var config in frequencyConfigs) {
+        if (data[config.key] != null) {
+          final item = data[config.key] as Map<String, dynamic>;
+          config.normalMax =
+              (item['normalMax'] as num?)?.toDouble() ?? config.normalMax;
+          config.warningMax =
+              (item['warningMax'] as num?)?.toDouble() ?? config.warningMax;
+        }
+      }
+    }
+
+    // 加载功率配置
+    if (json['Pt'] != null) {
+      final data = json['Pt'] as Map<String, dynamic>;
+      for (var config in ptConfigs) {
+        if (data[config.key] != null) {
+          final item = data[config.key] as Map<String, dynamic>;
+          config.normalMax =
+              (item['normalMax'] as num?)?.toDouble() ?? config.normalMax;
+          config.warningMax =
+              (item['warningMax'] as num?)?.toDouble() ?? config.warningMax;
+        }
+      }
     }
 
     // 加载振动配置
@@ -274,15 +476,15 @@ class ThresholdConfigProvider extends ChangeNotifier {
 
   Map<String, dynamic> _toJson() {
     return {
-      'current': {
-        for (var config in currentConfigs)
+      'I': {
+        for (var config in iConfigs)
           config.key: {
             'normalMax': config.normalMax,
             'warningMax': config.warningMax
           }
       },
-      'power': {
-        for (var config in powerConfigs)
+      'Ua': {
+        for (var config in uaConfigs)
           config.key: {
             'normalMax': config.normalMax,
             'warningMax': config.warningMax
@@ -291,6 +493,34 @@ class ThresholdConfigProvider extends ChangeNotifier {
       'pressure': {
         'high': pressureHighAlarm,
         'low': pressureLowAlarm,
+      },
+      'speed': {
+        for (var config in speedConfigs)
+          config.key: {
+            'normalMax': config.normalMax,
+            'warningMax': config.warningMax
+          }
+      },
+      'displacement': {
+        for (var config in displacementConfigs)
+          config.key: {
+            'normalMax': config.normalMax,
+            'warningMax': config.warningMax
+          }
+      },
+      'frequency': {
+        for (var config in frequencyConfigs)
+          config.key: {
+            'normalMax': config.normalMax,
+            'warningMax': config.warningMax
+          }
+      },
+      'Pt': {
+        for (var config in ptConfigs)
+          config.key: {
+            'normalMax': config.normalMax,
+            'warningMax': config.warningMax
+          }
       },
       'vibration': {
         for (var config in vibrationConfigs)
@@ -348,23 +578,51 @@ class ThresholdConfigProvider extends ChangeNotifier {
   /// 转换为后端格式的JSON
   Map<String, dynamic> _toBackendJson() {
     return {
-      'current': {
-        for (int i = 0; i < currentConfigs.length; i++)
+      'I': {
+        for (int i = 0; i < iConfigs.length; i++)
           'pump_${i + 1}': {
-            'normal_max': currentConfigs[i].normalMax,
-            'warning_max': currentConfigs[i].warningMax,
+            'normal_max': iConfigs[i].normalMax,
+            'warning_max': iConfigs[i].warningMax,
           }
       },
-      'power': {
-        for (int i = 0; i < powerConfigs.length; i++)
+      'Ua': {
+        for (int i = 0; i < uaConfigs.length; i++)
           'pump_${i + 1}': {
-            'normal_max': powerConfigs[i].normalMax,
-            'warning_max': powerConfigs[i].warningMax,
+            'normal_max': uaConfigs[i].normalMax,
+            'warning_max': uaConfigs[i].warningMax,
           }
       },
       'pressure': {
         'high_alarm': pressureHighAlarm,
         'low_alarm': pressureLowAlarm,
+      },
+      'speed': {
+        for (int i = 0; i < speedConfigs.length; i++)
+          'pump_${i + 1}': {
+            'normal_max': speedConfigs[i].normalMax,
+            'warning_max': speedConfigs[i].warningMax,
+          }
+      },
+      'displacement': {
+        for (int i = 0; i < displacementConfigs.length; i++)
+          'pump_${i + 1}': {
+            'normal_max': displacementConfigs[i].normalMax,
+            'warning_max': displacementConfigs[i].warningMax,
+          }
+      },
+      'frequency': {
+        for (int i = 0; i < frequencyConfigs.length; i++)
+          'pump_${i + 1}': {
+            'normal_max': frequencyConfigs[i].normalMax,
+            'warning_max': frequencyConfigs[i].warningMax,
+          }
+      },
+      'Pt': {
+        for (int i = 0; i < ptConfigs.length; i++)
+          'pump_${i + 1}': {
+            'normal_max': ptConfigs[i].normalMax,
+            'warning_max': ptConfigs[i].warningMax,
+          }
       },
       'vibration': {
         for (int i = 0; i < vibrationConfigs.length; i++)
@@ -381,19 +639,19 @@ class ThresholdConfigProvider extends ChangeNotifier {
   // ============================================================
 
   /// 更新电流配置
-  void updateCurrentConfig(int index, {double? normalMax, double? warningMax}) {
-    if (index >= 0 && index < currentConfigs.length) {
-      if (normalMax != null) currentConfigs[index].normalMax = normalMax;
-      if (warningMax != null) currentConfigs[index].warningMax = warningMax;
+  void updateIConfig(int index, {double? normalMax, double? warningMax}) {
+    if (index >= 0 && index < iConfigs.length) {
+      if (normalMax != null) iConfigs[index].normalMax = normalMax;
+      if (warningMax != null) iConfigs[index].warningMax = warningMax;
       notifyListeners();
     }
   }
 
-  /// 更新功率配置
-  void updatePowerConfig(int index, {double? normalMax, double? warningMax}) {
-    if (index >= 0 && index < powerConfigs.length) {
-      if (normalMax != null) powerConfigs[index].normalMax = normalMax;
-      if (warningMax != null) powerConfigs[index].warningMax = warningMax;
+  /// 更新电压配置
+  void updateUaConfig(int index, {double? normalMax, double? warningMax}) {
+    if (index >= 0 && index < uaConfigs.length) {
+      if (normalMax != null) uaConfigs[index].normalMax = normalMax;
+      if (warningMax != null) uaConfigs[index].warningMax = warningMax;
       notifyListeners();
     }
   }
@@ -403,6 +661,45 @@ class ThresholdConfigProvider extends ChangeNotifier {
     if (highAlarm != null) pressureHighAlarm = highAlarm;
     if (lowAlarm != null) pressureLowAlarm = lowAlarm;
     notifyListeners();
+  }
+
+  /// 更新速度配置
+  void updateSpeedConfig(int index, {double? normalMax, double? warningMax}) {
+    if (index >= 0 && index < speedConfigs.length) {
+      if (normalMax != null) speedConfigs[index].normalMax = normalMax;
+      if (warningMax != null) speedConfigs[index].warningMax = warningMax;
+      notifyListeners();
+    }
+  }
+
+  /// 更新位移配置
+  void updateDisplacementConfig(int index,
+      {double? normalMax, double? warningMax}) {
+    if (index >= 0 && index < displacementConfigs.length) {
+      if (normalMax != null) displacementConfigs[index].normalMax = normalMax;
+      if (warningMax != null)
+        displacementConfigs[index].warningMax = warningMax;
+      notifyListeners();
+    }
+  }
+
+  /// 更新频率配置
+  void updateFrequencyConfig(int index,
+      {double? normalMax, double? warningMax}) {
+    if (index >= 0 && index < frequencyConfigs.length) {
+      if (normalMax != null) frequencyConfigs[index].normalMax = normalMax;
+      if (warningMax != null) frequencyConfigs[index].warningMax = warningMax;
+      notifyListeners();
+    }
+  }
+
+  /// 更新功率配置
+  void updatePtConfig(int index, {double? normalMax, double? warningMax}) {
+    if (index >= 0 && index < ptConfigs.length) {
+      if (normalMax != null) ptConfigs[index].normalMax = normalMax;
+      if (warningMax != null) ptConfigs[index].warningMax = warningMax;
+      notifyListeners();
+    }
   }
 
   /// 更新振动配置
@@ -418,22 +715,42 @@ class ThresholdConfigProvider extends ChangeNotifier {
   /// 重置为默认配置
   void resetToDefault() {
     // 重置电流
-    for (var config in currentConfigs) {
+    for (var config in iConfigs) {
       config.normalMax = 50.0;
       config.warningMax = 80.0;
     }
-    // 重置功率
-    for (var config in powerConfigs) {
-      config.normalMax = 30.0;
-      config.warningMax = 50.0;
+    // 重置电压
+    for (var config in uaConfigs) {
+      config.normalMax = 400.0;
+      config.warningMax = 420.0;
     }
     // 重置压力
     pressureHighAlarm = 1.0;
     pressureLowAlarm = 0.3;
+    // 重置速度
+    for (var config in speedConfigs) {
+      config.normalMax = 1450.0;
+      config.warningMax = 1500.0;
+    }
+    // 重置位移
+    for (var config in displacementConfigs) {
+      config.normalMax = 0.5;
+      config.warningMax = 1.0;
+    }
+    // 重置频率
+    for (var config in frequencyConfigs) {
+      config.normalMax = 50.0;
+      config.warningMax = 52.0;
+    }
+    // 重置功率
+    for (var config in ptConfigs) {
+      config.normalMax = 10.0;
+      config.warningMax = 15.0;
+    }
     // 重置振动
     for (var config in vibrationConfigs) {
-      config.normalMax = 1.0;
-      config.warningMax = 1.5;
+      config.normalMax = 5.0;
+      config.warningMax = 10.0;
     }
     notifyListeners();
   }
@@ -443,36 +760,63 @@ class ThresholdConfigProvider extends ChangeNotifier {
   // ============================================================
 
   /// 获取电流颜色 (泵索引 1-6)
-  Color getCurrentColor(int pumpIndex, double current) {
-    if (pumpIndex < 1 || pumpIndex > currentConfigs.length) {
+  Color getIColor(int pumpIndex, double current) {
+    if (pumpIndex < 1 || pumpIndex > iConfigs.length) {
       return ThresholdColors.normal;
     }
-    return currentConfigs[pumpIndex - 1].getColor(current);
+    return iConfigs[pumpIndex - 1].getColor(current);
   }
 
-  /// 获取功率颜色 (泵索引 1-6)
-  Color getPowerColor(int pumpIndex, double power) {
-    if (pumpIndex < 1 || pumpIndex > powerConfigs.length) {
+  /// 获取电压颜色 (泵索引 1-6)
+  Color getUaColor(int pumpIndex, double voltage) {
+    if (pumpIndex < 1 || pumpIndex > uaConfigs.length) {
       return ThresholdColors.normal;
     }
-    return powerConfigs[pumpIndex - 1].getColor(power);
+    return uaConfigs[pumpIndex - 1].getColor(voltage);
   }
 
-  /// 获取压力颜色 (仅1号泵)
+  /// 获取压力颜色
   /// 低于lowAlarm: 红色报警
   /// 高于highAlarm: 红色报警
   /// 在范围内: 绿色正常
+  /// 注意：压力只有正常和报警两种状态，没有警告状态
   Color getPressureColor(double pressure) {
     if (pressure < pressureLowAlarm || pressure > pressureHighAlarm) {
       return ThresholdColors.alarm;
     }
-    // 接近边界时显示警告
-    final lowMargin = (pressureHighAlarm - pressureLowAlarm) * 0.2;
-    if (pressure < pressureLowAlarm + lowMargin ||
-        pressure > pressureHighAlarm - lowMargin) {
-      return ThresholdColors.warning;
-    }
     return ThresholdColors.normal;
+  }
+
+  /// 获取速度颜色 (泵索引 1-6)
+  Color getSpeedColor(int pumpIndex, double speed) {
+    if (pumpIndex < 1 || pumpIndex > speedConfigs.length) {
+      return ThresholdColors.normal;
+    }
+    return speedConfigs[pumpIndex - 1].getColor(speed);
+  }
+
+  /// 获取位移颜色 (泵索引 1-6)
+  Color getDisplacementColor(int pumpIndex, double displacement) {
+    if (pumpIndex < 1 || pumpIndex > displacementConfigs.length) {
+      return ThresholdColors.normal;
+    }
+    return displacementConfigs[pumpIndex - 1].getColor(displacement);
+  }
+
+  /// 获取频率颜色 (泵索引 1-6)
+  Color getFrequencyColor(int pumpIndex, double frequency) {
+    if (pumpIndex < 1 || pumpIndex > frequencyConfigs.length) {
+      return ThresholdColors.normal;
+    }
+    return frequencyConfigs[pumpIndex - 1].getColor(frequency);
+  }
+
+  /// 获取功率颜色 (泵索引 1-6)
+  Color getPtColor(int pumpIndex, double power) {
+    if (pumpIndex < 1 || pumpIndex > ptConfigs.length) {
+      return ThresholdColors.normal;
+    }
+    return ptConfigs[pumpIndex - 1].getColor(power);
   }
 
   /// 获取振动颜色 (泵索引 1-6)
@@ -488,15 +832,39 @@ class ThresholdConfigProvider extends ChangeNotifier {
   // ============================================================
 
   /// 获取电流阈值配置 (泵索引 1-6)
-  ThresholdConfig? getCurrentThreshold(int pumpIndex) {
-    if (pumpIndex < 1 || pumpIndex > currentConfigs.length) return null;
-    return currentConfigs[pumpIndex - 1];
+  ThresholdConfig? getIThreshold(int pumpIndex) {
+    if (pumpIndex < 1 || pumpIndex > iConfigs.length) return null;
+    return iConfigs[pumpIndex - 1];
+  }
+
+  /// 获取电压阈值配置 (泵索引 1-6)
+  ThresholdConfig? getUaThreshold(int pumpIndex) {
+    if (pumpIndex < 1 || pumpIndex > uaConfigs.length) return null;
+    return uaConfigs[pumpIndex - 1];
+  }
+
+  /// 获取速度阈值配置 (泵索引 1-6)
+  ThresholdConfig? getSpeedThreshold(int pumpIndex) {
+    if (pumpIndex < 1 || pumpIndex > speedConfigs.length) return null;
+    return speedConfigs[pumpIndex - 1];
+  }
+
+  /// 获取位移阈值配置 (泵索引 1-6)
+  ThresholdConfig? getDisplacementThreshold(int pumpIndex) {
+    if (pumpIndex < 1 || pumpIndex > displacementConfigs.length) return null;
+    return displacementConfigs[pumpIndex - 1];
+  }
+
+  /// 获取频率阈值配置 (泵索引 1-6)
+  ThresholdConfig? getFrequencyThreshold(int pumpIndex) {
+    if (pumpIndex < 1 || pumpIndex > frequencyConfigs.length) return null;
+    return frequencyConfigs[pumpIndex - 1];
   }
 
   /// 获取功率阈值配置 (泵索引 1-6)
-  ThresholdConfig? getPowerThreshold(int pumpIndex) {
-    if (pumpIndex < 1 || pumpIndex > powerConfigs.length) return null;
-    return powerConfigs[pumpIndex - 1];
+  ThresholdConfig? getPtThreshold(int pumpIndex) {
+    if (pumpIndex < 1 || pumpIndex > ptConfigs.length) return null;
+    return ptConfigs[pumpIndex - 1];
   }
 
   /// 获取振动阈值配置 (泵索引 1-6)

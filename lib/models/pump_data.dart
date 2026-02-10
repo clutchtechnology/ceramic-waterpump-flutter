@@ -5,6 +5,7 @@
 
 // ============================================================
 // 1, 单个水泵实时数据 (对应 DB2 数据块)
+// 字段名与 InfluxDB / WebSocket 推送完全一致
 // ============================================================
 class PumpData {
   // 2, 水泵编号 (1-6)
@@ -13,29 +14,29 @@ class PumpData {
   // 3, 运行状态 (running/stopped)
   final String status;
 
-  // 4, 功率值 (kW) - 有功功率
-  final double power;
+  // 4, 总有功功率 Pt (kW)
+  final double pt;
 
-  // 5, 能耗值 (kWh) - 累计电量
-  final double energy;
+  // 5, 正向有功电能 ImpEp (kWh)
+  final double impEp;
 
-  // 6, A相电流 (A)
-  final double currentA;
+  // 6, A相电流 I_0 (A)
+  final double i0;
 
-  // 7, B相电流 (A)
-  final double currentB;
+  // 7, B相电流 I_1 (A)
+  final double i1;
 
-  // 8, C相电流 (A)
-  final double currentC;
+  // 8, C相电流 I_2 (A)
+  final double i2;
 
-  // 9, A相电压 (V)
-  final double voltageA;
+  // 9, A相电压 Ua_0 (V)
+  final double ua0;
 
-  // 10, B相电压 (V)
-  final double voltageB;
+  // 10, B相电压 Ua_1 (V)
+  final double ua1;
 
-  // 11, C相电压 (V)
-  final double voltageC;
+  // 11, C相电压 Ua_2 (V)
+  final double ua2;
 
   // 12, X轴振动速度 (mm/s)
   final double vibVelocityX;
@@ -46,13 +47,13 @@ class PumpData {
   // 14, Z轴振动速度 (mm/s)
   final double vibVelocityZ;
 
-  // 15, X轴振动位移 (μm)
+  // 15, X轴振动位移 (um)
   final double vibDisplacementX;
 
-  // 16, Y轴振动位移 (μm)
+  // 16, Y轴振动位移 (um)
   final double vibDisplacementY;
 
-  // 17, Z轴振动位移 (μm)
+  // 17, Z轴振动位移 (um)
   final double vibDisplacementZ;
 
   // 18, X轴振动频率 (Hz)
@@ -67,14 +68,14 @@ class PumpData {
   PumpData({
     required this.id,
     required this.status,
-    required this.power,
-    required this.energy,
-    required this.currentA,
-    required this.currentB,
-    required this.currentC,
-    required this.voltageA,
-    required this.voltageB,
-    required this.voltageC,
+    required this.pt,
+    required this.impEp,
+    required this.i0,
+    required this.i1,
+    required this.i2,
+    required this.ua0,
+    required this.ua1,
+    required this.ua2,
     required this.vibVelocityX,
     required this.vibVelocityY,
     required this.vibVelocityZ,
@@ -92,22 +93,22 @@ class PumpData {
       id: json['id'] as int? ?? 0,
       // 3, 解析运行状态
       status: json['status'] as String? ?? 'stopped',
-      // 4, 解析功率
-      power: (json['power'] as num?)?.toDouble() ?? 0.0,
-      // 5, 解析能耗
-      energy: (json['energy'] as num?)?.toDouble() ?? 0.0,
+      // 4, 解析总有功功率
+      pt: (json['Pt'] as num?)?.toDouble() ?? 0.0,
+      // 5, 解析正向有功电能
+      impEp: (json['ImpEp'] as num?)?.toDouble() ?? 0.0,
       // 6, 解析A相电流
-      currentA: (json['current_a'] as num?)?.toDouble() ?? 0.0,
+      i0: (json['I_0'] as num?)?.toDouble() ?? 0.0,
       // 7, 解析B相电流
-      currentB: (json['current_b'] as num?)?.toDouble() ?? 0.0,
+      i1: (json['I_1'] as num?)?.toDouble() ?? 0.0,
       // 8, 解析C相电流
-      currentC: (json['current_c'] as num?)?.toDouble() ?? 0.0,
+      i2: (json['I_2'] as num?)?.toDouble() ?? 0.0,
       // 9, 解析A相电压
-      voltageA: (json['voltage_a'] as num?)?.toDouble() ?? 0.0,
+      ua0: (json['Ua_0'] as num?)?.toDouble() ?? 0.0,
       // 10, 解析B相电压
-      voltageB: (json['voltage_b'] as num?)?.toDouble() ?? 0.0,
+      ua1: (json['Ua_1'] as num?)?.toDouble() ?? 0.0,
       // 11, 解析C相电压
-      voltageC: (json['voltage_c'] as num?)?.toDouble() ?? 0.0,
+      ua2: (json['Ua_2'] as num?)?.toDouble() ?? 0.0,
       // 12, 解析X轴振动速度
       vibVelocityX: (json['vib_velocity_x'] as num?)?.toDouble() ?? 0.0,
       // 13, 解析Y轴振动速度
@@ -133,24 +134,24 @@ class PumpData {
   bool get isRunning => status == 'running';
 
   // 6, 三相电流平均值
-  double get currentAvg => (currentA + currentB + currentC) / 3;
+  double get iAvg => (i0 + i1 + i2) / 3;
 
   // 9, 三相电压平均值
-  double get voltageAvg => (voltageA + voltageB + voltageC) / 3;
+  double get uaAvg => (ua0 + ua1 + ua2) / 3;
 
-  /// 创建离线状态空数据
+  // 创建离线状态空数据
   factory PumpData.empty(int id) {
     return PumpData(
       id: id,
       status: 'stopped',
-      power: 0.0,
-      energy: 0.0,
-      currentA: 0.0,
-      currentB: 0.0,
-      currentC: 0.0,
-      voltageA: 0.0,
-      voltageB: 0.0,
-      voltageC: 0.0,
+      pt: 0.0,
+      impEp: 0.0,
+      i0: 0.0,
+      i1: 0.0,
+      i2: 0.0,
+      ua0: 0.0,
+      ua1: 0.0,
+      ua2: 0.0,
       vibVelocityX: 0.0,
       vibVelocityY: 0.0,
       vibVelocityZ: 0.0,

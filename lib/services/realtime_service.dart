@@ -28,10 +28,6 @@ class RealtimeService {
   // 7, 连接状态回调
   void Function(WebSocketState)? onConnectionStateChanged;
 
-  // 8, 数据接收计数器 (用于日志)
-  int _dataReceivedCount = 0;
-  DateTime? _lastDataTime;
-
   /// 1, 启动 WebSocket 订阅 (替代原 startPolling)
   void startPolling({int intervalSeconds = 5}) {
     // intervalSeconds 参数保留以保持 API 兼容，但 WebSocket 模式下无意义
@@ -52,19 +48,6 @@ class RealtimeService {
     // 1.1, 设置 WebSocket 回调（每次都设置，确保热重载后回调有效）
     _wsService.onRealtimeDataUpdate = (data) {
       if (!_isDisposed) {
-        _dataReceivedCount++;
-        final now = DateTime.now();
-        final interval = _lastDataTime != null
-            ? now.difference(_lastDataTime!).inMilliseconds
-            : 0;
-        _lastDataTime = now;
-
-        // 每 10 条数据打印一次日志
-        if (_dataReceivedCount % 10 == 0) {
-          print(
-              '[RealtimeService] 收到第 $_dataReceivedCount 条数据，间隔: ${interval}ms');
-        }
-
         onDataUpdate?.call(data);
       }
     };

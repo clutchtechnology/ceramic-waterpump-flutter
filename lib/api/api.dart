@@ -52,17 +52,26 @@ class Api {
   // 阈值配置接口
   // ============================================================
 
-  /// 10, 获取/设置阈值配置 (压力、振动报警阈值)
-  static const String thresholds = '/api/waterpump/config/thresholds';
+  /// 10, 获取所有阈值配置
+  static const String thresholds = '/api/thresholds';
+
+  /// 11, 更新阈值配置
+  static const String thresholdsUpdate = '/api/thresholds';
+
+  /// 12, 重置阈值为默认值
+  static const String thresholdsReset = '/api/thresholds/reset';
 
   // ============================================================
   // 报警日志接口
   // ============================================================
 
-  /// 11, 查询报警日志 (支持分页和时间范围)
+  /// 13, 查询最近报警记录 (新API)
+  static const String alarmsRecent = '/api/thresholds/alarms/recent';
+
+  /// 14, 查询报警日志 (旧API，兼容)
   static const String alarms = '/api/waterpump/alarms';
 
-  /// 12, 报警统计 (各类型报警数量)
+  /// 15, 报警统计 (各类型报警数量)
   static const String alarmsCount = '/api/waterpump/alarms/count';
 
   // ============================================================

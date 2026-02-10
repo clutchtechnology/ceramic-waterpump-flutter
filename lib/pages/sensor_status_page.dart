@@ -6,16 +6,11 @@ import '../services/websocket_service.dart';
 import '../widgets/tech_line_widgets.dart';
 
 /// 设备状态位显示页面
-/// 显示 DB3 (DataState) 的模块状态
+/// 显示 DB1 和 DB3 的模块状态（合并显示）
 class SensorStatusPage extends StatefulWidget {
   const SensorStatusPage({
     super.key,
-    required this.dbKey,
-    required this.title,
   });
-
-  final String dbKey;
-  final String title;
 
   @override
   State<SensorStatusPage> createState() => SensorStatusPageState();
@@ -71,6 +66,7 @@ class SensorStatusPageState extends State<SensorStatusPage> {
     // 设置 WebSocket 回调
     _statusService.onDataUpdate = (data) {
       if (mounted && _isPollingActive) {
+        print('[SensorStatusPage] 收到设备状态更新: ${data.summary?.total ?? 0} 个设备');
         setState(() {
           if (data.success) {
             _response = data;
@@ -84,6 +80,7 @@ class SensorStatusPageState extends State<SensorStatusPage> {
 
     _statusService.onError = (error) {
       if (mounted && _isPollingActive) {
+        print('[SensorStatusPage] 错误: $error');
         setState(() {
           _errorMessage = error;
         });
@@ -139,99 +136,85 @@ class SensorStatusPageState extends State<SensorStatusPage> {
   Widget build(BuildContext context) {
     return Container(
       color: TechColors.bgDeep,
-      child: Column(
-        children: [
-          // 顶部状态栏
-          _buildHeader(),
-          // 列表内容
-          Expanded(
-            child: _errorMessage != null
-                ? _buildErrorWidget()
-                : _buildStatusList(
-                    _response?.getStatusByDb(widget.dbKey) ?? []),
-          ),
-        ],
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      child: _errorMessage != null
+          ? _buildErrorWidget()
+          : Column(
+              children: [
+                // 上半部分 - DB1
+                Expanded(
+                  child: _buildDbCard('DB1', _response?.getStatusByDb('db1') ?? []),
+                ),
+                const SizedBox(height: 2),
+                // 下半部分 - DB3
+                Expanded(
+                  child: _buildDbCard('DB3', _response?.getStatusByDb('db3') ?? []),
+                ),
+              ],
+            ),
     );
   }
 
-  /// 顶部状态栏
-  Widget _buildHeader() {
-    final statusList = _response?.getStatusByDb(widget.dbKey) ?? [];
-    final summary = _response?.getSummaryByDb(widget.dbKey);
+  /// DB 卡片（包含标题栏和状态网格）
+  Widget _buildDbCard(String dbKey, List<DeviceStatus> statusList) {
+    final summary = _response?.getSummaryByDb(dbKey.toLowerCase());
     final totalCount = summary?.total ?? statusList.length;
     final normalCount =
         summary?.normal ?? statusList.where((item) => item.isNormal).length;
     final errorCount =
         summary?.error ?? statusList.where((item) => !item.isNormal).length;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: TechColors.bgDark,
-        border: Border(
-          bottom: BorderSide(
-            color: TechColors.borderDark.withOpacity(0.5),
-            width: 1,
-          ),
-        ),
-      ),
-      child: Row(
+    return TechPanel(
+      accentColor: TechColors.glowCyan,
+      child: Column(
         children: [
-          // 标题
-          Text(
-            widget.title,
-            style: TextStyle(
-              color: TechColors.textPrimary,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Roboto Mono',
-            ),
-          ),
-          const Spacer(),
-          // 统计信息
-          _buildStatChip('总计', totalCount, TechColors.glowCyan),
-          const SizedBox(width: 12),
-          _buildStatChip('正常', normalCount, TechColors.glowGreen),
-          const SizedBox(width: 12),
-          _buildStatChip('异常', errorCount, TechColors.glowRed),
-          const SizedBox(width: 16),
-          // 数据源标签
-          if (_response?.source != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: TechColors.glowCyan.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: TechColors.glowCyan.withOpacity(0.3)),
-              ),
-              child: Text(
-                _response!.source!.toUpperCase(),
-                style: const TextStyle(
-                  color: TechColors.glowCyan,
-                  fontSize: 10,
-                  fontFamily: 'Roboto Mono',
+          // 标题栏
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: TechColors.bgDark.withOpacity(0.5),
+              border: Border(
+                bottom: BorderSide(
+                  color: TechColors.borderDark.withOpacity(0.5),
+                  width: 1,
                 ),
               ),
             ),
-          const SizedBox(width: 12),
-          // 刷新按钮
-          IconButton(
-            onPressed: _isRefreshing ? null : _fetchData,
-            icon: _isRefreshing
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: TechColors.glowCyan,
+            child: Row(
+              children: [
+                // 标题
+                Text(
+                  dbKey,
+                  style: const TextStyle(
+                    color: TechColors.glowCyan,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Roboto Mono',
+                  ),
+                ),
+                const Spacer(),
+                // 统计信息
+                _buildStatChip('总计', totalCount, TechColors.glowCyan),
+                const SizedBox(width: 8),
+                _buildStatChip('正常', normalCount, TechColors.glowCyan),
+                const SizedBox(width: 8),
+                _buildStatChip('异常', errorCount, TechColors.glowRed),
+              ],
+            ),
+          ),
+          // 状态网格
+          Expanded(
+            child: statusList.isEmpty
+                ? const Center(
+                    child: Text(
+                      '暂无数据',
+                      style: TextStyle(
+                        color: TechColors.textSecondary,
+                        fontSize: 14,
+                      ),
                     ),
                   )
-                : const Icon(
-                    Icons.refresh,
-                    color: TechColors.glowCyan,
-                    size: 20,
-                  ),
+                : _buildStatusGrid(statusList),
           ),
         ],
       ),
@@ -241,10 +224,10 @@ class SensorStatusPageState extends State<SensorStatusPage> {
   /// 统计标签
   Widget _buildStatChip(String label, int count, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(4),
         border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Row(
@@ -254,7 +237,7 @@ class SensorStatusPageState extends State<SensorStatusPage> {
             label,
             style: TextStyle(
               color: color,
-              fontSize: 11,
+              fontSize: 10,
             ),
           ),
           const SizedBox(width: 4),
@@ -262,7 +245,7 @@ class SensorStatusPageState extends State<SensorStatusPage> {
             '$count',
             style: TextStyle(
               color: color,
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: FontWeight.bold,
               fontFamily: 'Roboto Mono',
             ),
@@ -304,142 +287,117 @@ class SensorStatusPageState extends State<SensorStatusPage> {
     );
   }
 
-  /// 状态列表（单列紧凑布局，适合水泵房较少的设备）
-  Widget _buildStatusList(List<DeviceStatus> statusList) {
-    if (statusList.isEmpty) {
-      return const Center(
-        child: Text(
-          '暂无数据',
-          style: TextStyle(
-            color: TechColors.textSecondary,
-            fontSize: 14,
+  /// 状态网格（每行3列，每条高度40px）
+  Widget _buildStatusGrid(List<DeviceStatus> statusList) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 1, 计算可用宽度（减去 padding）
+        final availableWidth = constraints.maxWidth - 8;
+        
+        // 2, 计算每个项目的宽度（一行3列，减去间距）
+        final itemWidth = (availableWidth - 8) / 3;
+        
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(4),
+          child: Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            children: statusList
+                .map((status) => _buildStatusItem(status, itemWidth))
+                .toList(),
           ),
-        ),
-      );
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: statusList.asMap().entries.map((entry) {
-          return _buildStatusCard(entry.value, entry.key);
-        }).toList(),
-      ),
+        );
+      },
     );
   }
 
-  /// 单个状态卡片
-  Widget _buildStatusCard(DeviceStatus status, int index) {
+  /// 单个状态项（固定高度40px，宽度由父组件传入）
+  Widget _buildStatusItem(DeviceStatus status, double itemWidth) {
     final hasError = !status.isNormal;
     final accentColor = hasError ? TechColors.glowRed : TechColors.glowGreen;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      width: itemWidth,
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: TechColors.bgDark.withOpacity(0.6),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(4),
         border: Border.all(
           color: hasError
               ? TechColors.glowRed.withOpacity(0.4)
               : TechColors.borderDark.withOpacity(0.3),
           width: 1,
         ),
-        boxShadow: hasError
-            ? [
-                BoxShadow(
-                  color: TechColors.glowRed.withOpacity(0.1),
-                  blurRadius: 8,
-                  spreadRadius: 0,
-                ),
-              ]
-            : null,
       ),
       child: Row(
         children: [
-          // 序号
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: TechColors.bgMedium,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              '${index + 1}',
-              style: const TextStyle(
-                color: TechColors.textSecondary,
-                fontSize: 12,
-                fontFamily: 'Roboto Mono',
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
           // 状态灯
           Container(
-            width: 12,
-            height: 12,
+            width: 8,
+            height: 8,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: accentColor,
               boxShadow: [
                 BoxShadow(
                   color: accentColor.withOpacity(0.6),
-                  blurRadius: 6,
+                  blurRadius: 4,
                   spreadRadius: 1,
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          // 设备名称
+          const SizedBox(width: 6),
+          // 设备名称（优先显示 plcName，否则显示 deviceName）
           Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  status.deviceName,
-                  style: const TextStyle(
-                    color: TechColors.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  status.deviceId,
-                  style: const TextStyle(
-                    color: TechColors.textSecondary,
-                    fontSize: 10,
-                    fontFamily: 'Roboto Mono',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          // Error 值
-          _buildValueCell('Error', status.error, TechColors.glowRed),
-          const SizedBox(width: 16),
-          // Status 值
-          _buildStatusCell(status.statusCode, status.statusHex),
-          const SizedBox(width: 16),
-          // 状态文字
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: accentColor.withOpacity(0.3)),
-            ),
             child: Text(
-              status.isNormal ? '正常' : '异常',
-              style: TextStyle(
-                color: accentColor,
+              status.plcName ?? status.deviceName,
+              style: const TextStyle(
+                color: TechColors.textPrimary,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 4),
+          // Error 值
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            decoration: BoxDecoration(
+              color: status.error
+                  ? TechColors.glowRed.withOpacity(0.2)
+                  : TechColors.bgMedium.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(2),
+            ),
+            child: Text(
+              status.error ? '1' : '0',
+              style: TextStyle(
+                color: status.error ? TechColors.glowRed : TechColors.textSecondary,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto Mono',
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          // Status 值
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            decoration: BoxDecoration(
+              color: hasError
+                  ? TechColors.glowRed.withOpacity(0.2)
+                  : TechColors.bgMedium.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(2),
+            ),
+            child: Text(
+              status.statusHex,
+              style: TextStyle(
+                color: hasError ? TechColors.glowRed : TechColors.textSecondary,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto Mono',
               ),
             ),
           ),
@@ -448,86 +406,5 @@ class SensorStatusPageState extends State<SensorStatusPage> {
     );
   }
 
-  /// Error 值单元格
-  Widget _buildValueCell(String label, bool value, Color activeColor) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          '$label:',
-          style: const TextStyle(
-            color: TechColors.textSecondary,
-            fontSize: 11,
-          ),
-        ),
-        const SizedBox(width: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: value
-                ? activeColor.withOpacity(0.2)
-                : TechColors.bgMedium.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(
-              color: value
-                  ? activeColor.withOpacity(0.5)
-                  : TechColors.borderDark.withOpacity(0.3),
-            ),
-          ),
-          child: Text(
-            value ? '1' : '0',
-            style: TextStyle(
-              color: value ? activeColor : TechColors.textSecondary,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Roboto Mono',
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
-  /// Status 值单元格
-  Widget _buildStatusCell(int statusCode, String statusHex) {
-    final hasError = statusCode != 0;
-    final color = hasError ? TechColors.glowRed : TechColors.textSecondary;
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Text(
-          'Status:',
-          style: TextStyle(
-            color: TechColors.textSecondary,
-            fontSize: 11,
-          ),
-        ),
-        const SizedBox(width: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: hasError
-                ? TechColors.glowRed.withOpacity(0.2)
-                : TechColors.bgMedium.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(
-              color: hasError
-                  ? TechColors.glowRed.withOpacity(0.5)
-                  : TechColors.borderDark.withOpacity(0.3),
-            ),
-          ),
-          child: Text(
-            statusHex,
-            style: TextStyle(
-              color: color,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Roboto Mono',
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 }

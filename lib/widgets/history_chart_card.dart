@@ -46,7 +46,17 @@ class HistoryChartCard extends StatelessWidget {
   final VoidCallback onRefresh;
 
   /// 图表数据 (x为索引, y为值)
+  /// 单线模式: data 不为空, multiLineData 为空
+  /// 多线模式: data 为空, multiLineData 不为空
   final List<FlSpot> data;
+
+  /// 多线数据 (用于三相电流/电压, 三轴振动)
+  /// Map<线名称, 数据点列表>
+  /// 例如: {'A': [点], 'B': [点], 'C': [点]} 或 {'X': [点], 'Y': [点], 'Z': [点]}
+  final Map<String, List<FlSpot>>? multiLineData;
+
+  /// 多线颜色配置
+  final Map<String, Color>? multiLineColors;
 
   /// 是否正在加载
   final bool isLoading;
@@ -70,7 +80,9 @@ class HistoryChartCard extends StatelessWidget {
     required this.onStartTimeTap,
     required this.onEndTimeTap,
     required this.onRefresh,
-    required this.data,
+    this.data = const [],
+    this.multiLineData,
+    this.multiLineColors,
     this.isLoading = false,
     this.highAlarmThreshold,
     this.lowAlarmThreshold,
@@ -119,7 +131,7 @@ class HistoryChartCard extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         Text(
-          title,
+          '$title($yAxisLabel)',
           style: TextStyle(
             color: accentColor,
             fontSize: 14,
@@ -142,6 +154,54 @@ class HistoryChartCard extends StatelessWidget {
         // 刷新按钮
         _buildRefreshButton(),
       ],
+    );
+  }
+
+  /// 构建多线图例
+  Widget _buildMultiLineLegend() {
+    if (multiLineData == null || multiLineData!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final defaultColors = {
+      'A': const Color(0xFF00D4FF), // 青色 - A相
+      'B': const Color(0xFF0080FF), // 蓝色 - B相
+      'C': const Color(0xFFFFFFFF), // 白色 - C相
+      'X': const Color(0xFF00D4FF), // 青色 - X轴
+      'Y': const Color(0xFF0080FF), // 蓝色 - Y轴
+      'Z': const Color(0xFFFFFFFF), // 白色 - Z轴
+    };
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: multiLineData!.keys.map((lineName) {
+        final lineColor = multiLineColors?[lineName] ?? defaultColors[lineName] ?? accentColor;
+        return Padding(
+          padding: const EdgeInsets.only(right: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 10,
+                height: 2,
+                decoration: BoxDecoration(
+                  color: lineColor,
+                  borderRadius: BorderRadius.circular(1),
+                ),
+              ),
+              const SizedBox(width: 3),
+              Text(
+                lineName,
+                style: TextStyle(
+                  color: lineColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -259,7 +319,19 @@ class HistoryChartCard extends StatelessWidget {
 
   /// 构建图表
   Widget _buildChart() {
-    if (data.isEmpty) {
+    // 判断是单线还是多线模式
+    final isMultiLine = multiLineData != null && multiLineData!.isNotEmpty;
+    
+    if (!isMultiLine && data.isEmpty) {
+      return Center(
+        child: Text(
+          '暂无数据',
+          style: TextStyle(color: accentColor.withOpacity(0.4), fontSize: 12),
+        ),
+      );
+    }
+
+    if (isMultiLine && multiLineData!.values.every((list) => list.isEmpty)) {
       return Center(
         child: Text(
           '暂无数据',
@@ -269,14 +341,105 @@ class HistoryChartCard extends StatelessWidget {
     }
 
     // 计算Y轴范围
-    final values = data.map((e) => e.y).toList();
-    final minY = values.reduce((a, b) => a < b ? a : b);
-    final maxY = values.reduce((a, b) => a > b ? a : b);
+    List<double> allValues = [];
+    if (isMultiLine) {
+      for (final lineData in multiLineData!.values) {
+        allValues.addAll(lineData.map((e) => e.y));
+      }
+    } else {
+      allValues = data.map((e) => e.y).toList();
+    }
+
+    if (allValues.isEmpty) {
+      return Center(
+        child: Text(
+          '暂无数据',
+          style: TextStyle(color: accentColor.withOpacity(0.4), fontSize: 12),
+        ),
+      );
+    }
+
+    final minY = allValues.reduce((a, b) => a < b ? a : b);
+    final maxY = allValues.reduce((a, b) => a > b ? a : b);
     final range = maxY - minY;
     final padding = range * 0.1;
 
     final chartMinY = (minY - padding).clamp(0.0, double.infinity);
     final chartMaxY = maxY + padding;
+
+    // 构建线条数据
+    List<LineChartBarData> lineBarsData = [];
+    
+    if (isMultiLine) {
+      // 多线模式
+      final defaultColors = {
+        'A': const Color(0xFF00D4FF), // 青色 - A相
+        'B': const Color(0xFF0080FF), // 蓝色 - B相
+        'C': const Color(0xFFFFFFFF), // 白色 - C相
+        'X': const Color(0xFF00D4FF), // 青色 - X轴
+        'Y': const Color(0xFF0080FF), // 蓝色 - Y轴
+        'Z': const Color(0xFFFFFFFF), // 白色 - Z轴
+      };
+      
+      for (final entry in multiLineData!.entries) {
+        final lineName = entry.key;
+        final lineData = entry.value;
+        final lineColor = multiLineColors?[lineName] ?? defaultColors[lineName] ?? accentColor;
+        
+        if (lineData.isNotEmpty) {
+          lineBarsData.add(
+            LineChartBarData(
+              spots: lineData,
+              isCurved: true,
+              color: lineColor,
+              barWidth: 1.5,
+              dotData: FlDotData(
+                show: lineData.length <= 50,
+                getDotPainter: (spot, percent, barData, index) {
+                  return FlDotCirclePainter(
+                    radius: 1.5,
+                    color: lineColor,
+                    strokeWidth: 0,
+                  );
+                },
+              ),
+              belowBarData: BarAreaData(show: false),
+            ),
+          );
+        }
+      }
+    } else {
+      // 单线模式
+      lineBarsData.add(
+        LineChartBarData(
+          spots: data,
+          isCurved: true,
+          color: accentColor,
+          barWidth: 1.5,
+          dotData: FlDotData(
+            show: data.length <= 50,
+            getDotPainter: (spot, percent, barData, index) {
+              return FlDotCirclePainter(
+                radius: 1.5,
+                color: accentColor,
+                strokeWidth: 0,
+              );
+            },
+          ),
+          belowBarData: BarAreaData(
+            show: true,
+            gradient: LinearGradient(
+              colors: [
+                accentColor.withOpacity(0.2),
+                accentColor.withOpacity(0.0),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+        ),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.only(left: 4, right: 4, top: 4, bottom: 4),
@@ -284,35 +447,7 @@ class HistoryChartCard extends StatelessWidget {
         LineChartData(
           minY: chartMinY,
           maxY: chartMaxY,
-          lineBarsData: [
-            LineChartBarData(
-              spots: data,
-              isCurved: true,
-              color: accentColor,
-              barWidth: 1.5,
-              dotData: FlDotData(
-                show: data.length <= 50,
-                getDotPainter: (spot, percent, barData, index) {
-                  return FlDotCirclePainter(
-                    radius: 1.5,
-                    color: accentColor,
-                    strokeWidth: 0,
-                  );
-                },
-              ),
-              belowBarData: BarAreaData(
-                show: true,
-                gradient: LinearGradient(
-                  colors: [
-                    accentColor.withOpacity(0.2),
-                    accentColor.withOpacity(0.0),
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-              ),
-            ),
-          ],
+          lineBarsData: lineBarsData,
           // 高报警阈值线
           extraLinesData: ExtraLinesData(
             horizontalLines: [
@@ -357,22 +492,15 @@ class HistoryChartCard extends StatelessWidget {
                   return Text(
                     value.toStringAsFixed(1),
                     style: const TextStyle(
-                      color: TechColors.textSecondary,
-                      fontSize: 8,
+                      color: Colors.white,
+                      fontSize: 11,
                     ),
                   );
                 },
               ),
             ),
-            rightTitles: AxisTitles(
-              axisNameWidget: Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: Text(
-                  yAxisLabel,
-                  style: TextStyle(color: accentColor, fontSize: 9),
-                ),
-              ),
-              sideTitles: const SideTitles(showTitles: false),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
             ),
             topTitles: const AxisTitles(
               sideTitles: SideTitles(showTitles: false),
@@ -381,14 +509,21 @@ class HistoryChartCard extends StatelessWidget {
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 18,
-                interval: data.length > 10 ? (data.length / 5).ceilToDouble() : 2,
+                interval: (isMultiLine 
+                  ? (multiLineData!.values.first.length > 10 
+                      ? (multiLineData!.values.first.length / 5).ceilToDouble() 
+                      : 2)
+                  : (data.length > 10 ? (data.length / 5).ceilToDouble() : 2)),
                 getTitlesWidget: (value, meta) {
-                  if (value.toInt() >= 0 && value.toInt() < data.length) {
+                  final maxLength = isMultiLine 
+                    ? multiLineData!.values.first.length 
+                    : data.length;
+                  if (value.toInt() >= 0 && value.toInt() < maxLength) {
                     return Text(
                       value.toInt().toString(),
                       style: const TextStyle(
-                        color: TechColors.textSecondary,
-                        fontSize: 8,
+                        color: Colors.white,
+                        fontSize: 11,
                       ),
                     );
                   }
@@ -428,7 +563,7 @@ class HistoryChartCard extends StatelessWidget {
               getTooltipItems: (touchedSpots) {
                 return touchedSpots.map((spot) {
                   return LineTooltipItem(
-                    '${spot.y.toStringAsFixed(2)} $yAxisLabel',
+                    spot.y.toStringAsFixed(2),
                     TextStyle(color: accentColor, fontSize: 9),
                   );
                 }).toList();

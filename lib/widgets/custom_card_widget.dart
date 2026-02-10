@@ -11,33 +11,37 @@ class CustomCardWidget extends StatelessWidget {
   final String pumpNumber;
   final bool isRunning;
 
-  // 电气参数
-  final double power; // 功率 kW
-  final double energy; // 累计能耗 kWh
-  final double currentA; // A相电流 A
-  final double currentB; // B相电流 A
-  final double currentC; // C相电流 A
-  final double voltageA; // A相电压 V
-  final double voltageB; // B相电压 V
-  final double voltageC; // C相电压 V
+  // 电气参数 (字段名与 InfluxDB 一致)
+  final double pt; // 总有功功率 kW
+  final double impEp; // 正向有功电能 kWh
+  final double i0; // A相电流 A
+  final double i1; // B相电流 A
+  final double i2; // C相电流 A
+  final double ua0; // A相电压 V
+  final double ua1; // B相电压 V
+  final double ua2; // C相电压 V
 
   // 振动参数
   final double vibVelocityX; // X轴速度 mm/s
   final double vibVelocityY; // Y轴速度 mm/s
   final double vibVelocityZ; // Z轴速度 mm/s
-  final double vibDisplacementX; // X轴位移 μm
-  final double vibDisplacementY; // Y轴位移 μm
-  final double vibDisplacementZ; // Z轴位移 μm
+  final double vibDisplacementX; // X轴位移 um
+  final double vibDisplacementY; // Y轴位移 um
+  final double vibDisplacementZ; // Z轴位移 um
   final double vibFrequencyX; // X轴频率 Hz
   final double vibFrequencyY; // Y轴频率 Hz
   final double vibFrequencyZ; // Z轴频率 Hz
 
   // 压力参数 (仅 #1 水泵显示)
-  final double? pressure; // 压力 MPa
+  final double? pressure; // 压力 kPa
 
   // 颜色参数 (根据阈值配置)
   final Color? powerColor; // 功率颜色
   final Color? currentColor; // 电流颜色
+  final Color? voltageColor; // 电压颜色
+  final Color? speedColor; // 速度颜色
+  final Color? displacementColor; // 位移颜色
+  final Color? frequencyColor; // 频率颜色
   final Color? vibrationColor; // 振动颜色
   final Color? pressureColor; // 压力颜色
 
@@ -45,14 +49,14 @@ class CustomCardWidget extends StatelessWidget {
     super.key,
     required this.pumpNumber,
     this.isRunning = true,
-    this.power = 0.0,
-    this.energy = 0.0,
-    this.currentA = 0.0,
-    this.currentB = 0.0,
-    this.currentC = 0.0,
-    this.voltageA = 0.0,
-    this.voltageB = 0.0,
-    this.voltageC = 0.0,
+    this.pt = 0.0,
+    this.impEp = 0.0,
+    this.i0 = 0.0,
+    this.i1 = 0.0,
+    this.i2 = 0.0,
+    this.ua0 = 0.0,
+    this.ua1 = 0.0,
+    this.ua2 = 0.0,
     this.vibVelocityX = 0.0,
     this.vibVelocityY = 0.0,
     this.vibVelocityZ = 0.0,
@@ -65,6 +69,10 @@ class CustomCardWidget extends StatelessWidget {
     this.pressure,
     this.powerColor,
     this.currentColor,
+    this.voltageColor,
+    this.speedColor,
+    this.displacementColor,
+    this.frequencyColor,
     this.vibrationColor,
     this.pressureColor,
   });
@@ -103,8 +111,8 @@ class CustomCardWidget extends StatelessWidget {
           ),
           // 左上角：编号 + 状态指示灯
           Positioned(
-            top: 8,
-            left: 8,
+            top: 0,
+            left: 0,
             child: _buildStatusIndicator(),
           ),
           // 右上角：两个数据标签（左边电气参数，右边振动参数）
@@ -145,8 +153,8 @@ class CustomCardWidget extends StatelessWidget {
   /// 左边标签：电气参数（8行，#1水泵为9行）
   Widget _buildElectricalDataCard() {
     return Container(
-      width: 112 + 12,
-      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+      width: 112 + 32,
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
       decoration: BoxDecoration(
         color: TechColors.bgDeep.withOpacity(0.9),
         borderRadius: const BorderRadius.only(
@@ -164,29 +172,24 @@ class CustomCardWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildPowerItem(),
-          const SizedBox(height: 6),
           _buildEnergyItem(),
-          const SizedBox(height: 6),
-          _buildCurrentItem('A', currentA),
-          const SizedBox(height: 6),
-          _buildCurrentItem('B', currentB),
-          const SizedBox(height: 6),
-          _buildCurrentItem('C', currentC),
-          const SizedBox(height: 6),
-          _buildVoltageItem('A', voltageA),
-          const SizedBox(height: 6),
-          _buildVoltageItem('B', voltageB),
-          const SizedBox(height: 6),
-          _buildVoltageItem('C', voltageC),
+          _buildCurrentItem('A', i0),
+          _buildCurrentItem('B', i1),
+          _buildCurrentItem('C', i2),
+          _buildVoltageItem('A', ua0),
+          _buildVoltageItem('B', ua1),
+          _buildVoltageItem('C', ua2),
           // 压力（仅 #1 水泵显示）
           if (pressure != null) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             // 分割线
             Container(
               height: 1,
-              color: TechColors.glowCyan.withOpacity(0.4),
+              width: double.infinity,
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              color: TechColors.glowCyan.withOpacity(0.5),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             _buildPressureItem(),
           ],
         ],
@@ -197,8 +200,8 @@ class CustomCardWidget extends StatelessWidget {
   /// 右边标签：振动参数（9行）
   Widget _buildVibrationDataCard() {
     return Container(
-      width: 112 + 12,
-      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+      width: 112 + 32,
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
       decoration: BoxDecoration(
         color: TechColors.bgDeep.withOpacity(0.9),
         borderRadius: const BorderRadius.only(
@@ -216,21 +219,13 @@ class CustomCardWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildVibVelocityItem('X', vibVelocityX),
-          const SizedBox(height: 6),
           _buildVibVelocityItem('Y', vibVelocityY),
-          const SizedBox(height: 6),
           _buildVibVelocityItem('Z', vibVelocityZ),
-          const SizedBox(height: 6),
           _buildVibDisplacementItem('X', vibDisplacementX),
-          const SizedBox(height: 6),
           _buildVibDisplacementItem('Y', vibDisplacementY),
-          const SizedBox(height: 6),
           _buildVibDisplacementItem('Z', vibDisplacementZ),
-          const SizedBox(height: 6),
           _buildVibFrequencyItem('X', vibFrequencyX),
-          const SizedBox(height: 6),
           _buildVibFrequencyItem('Y', vibFrequencyY),
-          const SizedBox(height: 6),
           _buildVibFrequencyItem('Z', vibFrequencyZ),
         ],
       ),
@@ -304,13 +299,13 @@ class CustomCardWidget extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          PowerIcon(size: 15, color: color),
+          PowerIcon(size: 18, color: color),
           const SizedBox(width: 4),
           Text(
-            power.toStringAsFixed(1),
+            pt.toStringAsFixed(1),
             style: TextStyle(
               color: color,
-              fontSize: 16,
+              fontSize: 20,
               fontWeight: FontWeight.w600,
               fontFamily: 'Roboto Mono',
             ),
@@ -318,7 +313,7 @@ class CustomCardWidget extends StatelessWidget {
           const Text(
             'kW',
             style: TextStyle(
-              color: TechColors.textSecondary,
+              color: Colors.white,
               fontSize: 12,
             ),
           ),
@@ -335,13 +330,13 @@ class CustomCardWidget extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          EnergyIcon(size: 15, color: TechColors.glowOrange),
+          EnergyIcon(size: 18, color: TechColors.glowOrange),
           const SizedBox(width: 4),
           Text(
-            energy.toStringAsFixed(0),
+            impEp.toStringAsFixed(1),
             style: const TextStyle(
               color: TechColors.glowOrange,
-              fontSize: 16,
+              fontSize: 20,
               fontWeight: FontWeight.w600,
               fontFamily: 'Roboto Mono',
             ),
@@ -349,7 +344,7 @@ class CustomCardWidget extends StatelessWidget {
           const Text(
             'kWh',
             style: TextStyle(
-              color: TechColors.textSecondary,
+              color: Colors.white,
               fontSize: 12,
             ),
           ),
@@ -367,13 +362,13 @@ class CustomCardWidget extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CurrentIcon(size: 14, color: color),
+          CurrentIcon(size: 18, color: color),
           const SizedBox(width: 3),
           Text(
             '$phase:',
             style: TextStyle(
               color: color,
-              fontSize: 14,
+              fontSize: 18,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -382,7 +377,7 @@ class CustomCardWidget extends StatelessWidget {
             value.toStringAsFixed(1),
             style: TextStyle(
               color: color,
-              fontSize: 16,
+              fontSize: 20,
               fontWeight: FontWeight.w600,
               fontFamily: 'Roboto Mono',
             ),
@@ -390,7 +385,7 @@ class CustomCardWidget extends StatelessWidget {
           const Text(
             'A',
             style: TextStyle(
-              color: TechColors.textSecondary,
+              color: Colors.white,
               fontSize: 12,
             ),
           ),
@@ -401,20 +396,20 @@ class CustomCardWidget extends StatelessWidget {
 
   /// 电压数据项 - 格式：图标 + A: 数值 + 单位
   Widget _buildVoltageItem(String phase, double value) {
-    final color = powerColor ?? TechColors.glowCyan;
+    final color = voltageColor ?? TechColors.glowCyan;
     return FittedBox(
       fit: BoxFit.scaleDown,
       alignment: Alignment.centerLeft,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.bolt, size: 14, color: color),
+          Icon(Icons.bolt, size: 18, color: color),
           const SizedBox(width: 3),
           Text(
             '$phase:',
             style: TextStyle(
               color: color,
-              fontSize: 14,
+              fontSize: 18,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -423,7 +418,7 @@ class CustomCardWidget extends StatelessWidget {
             value.toStringAsFixed(1),
             style: TextStyle(
               color: color,
-              fontSize: 16,
+              fontSize: 20,
               fontWeight: FontWeight.w600,
               fontFamily: 'Roboto Mono',
             ),
@@ -431,7 +426,7 @@ class CustomCardWidget extends StatelessWidget {
           const Text(
             'V',
             style: TextStyle(
-              color: TechColors.textSecondary,
+              color: Colors.white,
               fontSize: 12,
             ),
           ),
@@ -442,29 +437,29 @@ class CustomCardWidget extends StatelessWidget {
 
   /// 振动速度数据项 - 格式：轴 + 数值 + 单位
   Widget _buildVibVelocityItem(String axis, double value) {
-    final color = vibrationColor ?? TechColors.glowGreen;
+    final color = speedColor ?? TechColors.glowGreen;
     return FittedBox(
       fit: BoxFit.scaleDown,
       alignment: Alignment.centerLeft,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.vibration, size: 14, color: color),
+          Icon(Icons.vibration, size: 18, color: color),
           const SizedBox(width: 3),
           Text(
             '$axis:',
             style: TextStyle(
               color: color,
-              fontSize: 14,
+              fontSize: 18,
               fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(width: 2),
           Text(
-            value.toStringAsFixed(2),
+            value.toStringAsFixed(1),
             style: TextStyle(
               color: color,
-              fontSize: 16,
+              fontSize: 20,
               fontWeight: FontWeight.w600,
               fontFamily: 'Roboto Mono',
             ),
@@ -472,7 +467,7 @@ class CustomCardWidget extends StatelessWidget {
           const Text(
             'mm/s',
             style: TextStyle(
-              color: TechColors.textSecondary,
+              color: Colors.white,
               fontSize: 10,
             ),
           ),
@@ -483,29 +478,29 @@ class CustomCardWidget extends StatelessWidget {
 
   /// 振动位移数据项 - 格式：轴 + 数值 + 单位
   Widget _buildVibDisplacementItem(String axis, double value) {
-    final color = vibrationColor ?? TechColors.glowGreen;
+    final color = displacementColor ?? TechColors.glowGreen;
     return FittedBox(
       fit: BoxFit.scaleDown,
       alignment: Alignment.centerLeft,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.straighten, size: 14, color: color),
+          Icon(Icons.straighten, size: 18, color: color),
           const SizedBox(width: 3),
           Text(
             '$axis:',
             style: TextStyle(
               color: color,
-              fontSize: 14,
+              fontSize: 18,
               fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(width: 2),
           Text(
-            value.toStringAsFixed(0),
+            value.toStringAsFixed(1),
             style: TextStyle(
               color: color,
-              fontSize: 16,
+              fontSize: 20,
               fontWeight: FontWeight.w600,
               fontFamily: 'Roboto Mono',
             ),
@@ -513,7 +508,7 @@ class CustomCardWidget extends StatelessWidget {
           const Text(
             'μm',
             style: TextStyle(
-              color: TechColors.textSecondary,
+              color: Colors.white,
               fontSize: 10,
             ),
           ),
@@ -524,20 +519,20 @@ class CustomCardWidget extends StatelessWidget {
 
   /// 振动频率数据项 - 格式：轴 + 数值 + 单位
   Widget _buildVibFrequencyItem(String axis, double value) {
-    final color = vibrationColor ?? TechColors.glowGreen;
+    final color = frequencyColor ?? TechColors.glowGreen;
     return FittedBox(
       fit: BoxFit.scaleDown,
       alignment: Alignment.centerLeft,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.graphic_eq, size: 14, color: color),
+          Icon(Icons.graphic_eq, size: 18, color: color),
           const SizedBox(width: 3),
           Text(
             '$axis:',
             style: TextStyle(
               color: color,
-              fontSize: 14,
+              fontSize: 18,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -546,7 +541,7 @@ class CustomCardWidget extends StatelessWidget {
             value.toStringAsFixed(1),
             style: TextStyle(
               color: color,
-              fontSize: 16,
+              fontSize: 20,
               fontWeight: FontWeight.w600,
               fontFamily: 'Roboto Mono',
             ),
@@ -554,7 +549,7 @@ class CustomCardWidget extends StatelessWidget {
           const Text(
             'Hz',
             style: TextStyle(
-              color: TechColors.textSecondary,
+              color: Colors.white,
               fontSize: 12,
             ),
           ),
@@ -572,22 +567,22 @@ class CustomCardWidget extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          PressureIcon(size: 14, color: color),
-          const SizedBox(width: 3),
+          PressureIcon(size: 18, color: color),
+          const SizedBox(width: 4),
           Text(
-            (pressure ?? 0.0).toStringAsFixed(3),
+            (pressure ?? 0.0).toStringAsFixed(1),
             style: TextStyle(
               color: color,
-              fontSize: 16,
+              fontSize: 20,
               fontWeight: FontWeight.w600,
               fontFamily: 'Roboto Mono',
             ),
           ),
           const SizedBox(width: 2),
           const Text(
-            'MPa',
+            'kPa',
             style: TextStyle(
-              color: TechColors.textSecondary,
+              color: Colors.white,
               fontSize: 12,
             ),
           ),

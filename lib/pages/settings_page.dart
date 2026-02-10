@@ -584,7 +584,7 @@ class _SettingsPageState extends State<SettingsPage> {
         margin: const EdgeInsets.fromLTRB(0, 12, 12, 12),
         child: TechPanel(
           title: '阈值设置',
-          accentColor: TechColors.glowOrange,
+          accentColor: TechColors.glowCyan,
           child: ThresholdSettingsWidget(provider: _thresholdProvider),
         ),
       );

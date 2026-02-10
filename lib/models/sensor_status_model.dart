@@ -13,6 +13,9 @@ class DeviceStatus {
   // 3, 设备显示名称 (1#水泵, 2#水泵, ..., 压力表)
   final String deviceName;
 
+  // 3.1, PLC 名称 (ElectricityMeter_0, VIB_1, ...)
+  final String? plcName;
+
   // 4, 关联的数据设备 ID (用于关联 DB8 数据)
   final String? dataDeviceId;
 
@@ -37,6 +40,7 @@ class DeviceStatus {
   DeviceStatus({
     required this.deviceId,
     required this.deviceName,
+    this.plcName,
     this.dataDeviceId,
     required this.offset,
     required this.enabled,
@@ -52,6 +56,8 @@ class DeviceStatus {
       deviceId: json['device_id'] ?? '',
       // 3, 解析设备名称
       deviceName: json['device_name'] ?? '',
+      // 3.1, 解析 PLC 名称
+      plcName: json['plc_name'],
       // 4, 解析关联数据设备
       dataDeviceId: json['data_device_id'],
       // 5, 解析偏移量

@@ -13,12 +13,13 @@ import '../models/pump_data.dart';
 import '../providers/threshold_config_provider.dart';
 import 'history_data_page.dart';
 import 'settings_page.dart';
-import 'alarm_log_page.dart';
 import 'sensor_status_page.dart';
 
-/// 主页面 - 带Tab导航
+/// 主页面 - 带Tab导航（不含报警日志）
 /// Tab1: 实时监控 (水泵卡片)
 /// Tab2: 历史数据 (图表)
+/// Tab3: 系统设置
+/// Tab4: 设备状态
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
 
@@ -43,8 +44,7 @@ class _MainPageState extends State<MainPage>
   final GlobalKey<HistoryDataPageState> _historyPageKey = GlobalKey();
 
   // 5, 状态页 GlobalKey，用于控制轮询
-  final GlobalKey<SensorStatusPageState> _db1StatusPageKey = GlobalKey();
-  final GlobalKey<SensorStatusPageState> _db3StatusPageKey = GlobalKey();
+  final GlobalKey<SensorStatusPageState> _statusPageKey = GlobalKey();
 
   // 6, 跟踪当前 Tab 索引 (用于控制轮询)
   int _currentTabIndex = 0;
@@ -63,18 +63,11 @@ class _MainPageState extends State<MainPage>
   // 9, 实时数据
   RealtimeBatchResponse? _realtimeData;
 
-  // 10, WebSocket 连接状态
-  WebSocketState _wsState = WebSocketState.disconnected;
-
-  // 11, UI 更新计数器 (用于日志)
-  int _uiUpdateCount = 0;
-  DateTime? _lastUiUpdateTime;
-
   @override
   void initState() {
     super.initState();
-    // 1, 初始化 Tab 控制器
-    _tabController = TabController(length: 5, vsync: this);
+    // 1, 初始化 Tab 控制器（4个Tab：实时数据、历史数据、系统设置、设备状态）
+    _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(_onTabChanged);
 
     // 3, 加载阈值配置并监听变化
@@ -108,10 +101,7 @@ class _MainPageState extends State<MainPage>
 
     // 5, 离开状态页时暂停轮询
     if (oldIndex == 3) {
-      _db1StatusPageKey.currentState?.pausePolling();
-    }
-    if (oldIndex == 4) {
-      _db3StatusPageKey.currentState?.pausePolling();
+      _statusPageKey.currentState?.pausePolling();
     }
 
     // 4, 进入历史数据页面时刷新
@@ -120,9 +110,7 @@ class _MainPageState extends State<MainPage>
     }
     // 5, 进入状态页面时恢复轮询
     else if (newIndex == 3) {
-      _db1StatusPageKey.currentState?.resumePolling();
-    } else if (newIndex == 4) {
-      _db3StatusPageKey.currentState?.resumePolling();
+      _statusPageKey.currentState?.resumePolling();
     }
   }
 
@@ -130,7 +118,7 @@ class _MainPageState extends State<MainPage>
   void _startClockTimer() {
     _updateClockTime();
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return; // 7.1, 检查 mounted 状态
+      if (!mounted) return;
       _updateClockTime();
     });
   }
@@ -186,7 +174,7 @@ class _MainPageState extends State<MainPage>
     _healthCheckTimer = Timer.periodic(
       const Duration(seconds: 10),
       (_) {
-        if (!mounted) return; // 8.1, 检查 mounted 状态
+        if (!mounted) return;
         _checkHealth();
       },
     );
@@ -196,18 +184,6 @@ class _MainPageState extends State<MainPage>
   void _startRealtimePolling() {
     _realtimeService.onDataUpdate = (data) {
       if (mounted) {
-        _uiUpdateCount++;
-        final now = DateTime.now();
-        final interval = _lastUiUpdateTime != null 
-            ? now.difference(_lastUiUpdateTime!).inMilliseconds 
-            : 0;
-        _lastUiUpdateTime = now;
-
-        // 每 10 次更新打印一次日志
-        if (_uiUpdateCount % 10 == 0) {
-          print('[MainPage] UI 更新第 $_uiUpdateCount 次，间隔: ${interval}ms');
-        }
-
         setState(() {
           _realtimeData = data;
         });
@@ -224,10 +200,9 @@ class _MainPageState extends State<MainPage>
 
     // 监听 WebSocket 连接状态
     _realtimeService.onConnectionStateChanged = (state) {
+      // 连接状态变化时的处理（如需显示可添加状态字段）
       if (mounted) {
-        setState(() {
-          _wsState = state;
-        });
+        debugPrint('[MainPage] WebSocket 状态变化: $state');
       }
     };
 
@@ -264,24 +239,14 @@ class _MainPageState extends State<MainPage>
               controller: _tabController,
               physics: const NeverScrollableScrollPhysics(),
               children: [
-                // Tab1: 实时监控
+                // Tab1: 实时数据
                 _buildRealtimeContent(),
                 // Tab2: 历史数据
                 HistoryDataPage(key: _historyPageKey),
                 // Tab3: 系统设置 - 传入共享的阈值配置Provider
                 SettingsPage(thresholdProvider: _thresholdProvider),
-                // Tab4: DB1 状态 - 使用GlobalKey控制轮询
-                SensorStatusPage(
-                  key: _db1StatusPageKey,
-                  dbKey: 'db1',
-                  title: '设备状态位监控 (DB1)',
-                ),
-                // Tab5: DB3 状态 - 使用GlobalKey控制轮询
-                SensorStatusPage(
-                  key: _db3StatusPageKey,
-                  dbKey: 'db3',
-                  title: '设备状态位监控 (DB3)',
-                ),
+                // Tab4: 设备状态 - 合并 DB1 和 DB3
+                SensorStatusPage(key: _statusPageKey),
               ],
             ),
           ),
@@ -298,9 +263,10 @@ class _MainPageState extends State<MainPage>
         height: 40,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: TechColors.bgDark.withOpacity(0.95),
+          color: TechColors.bgDark.withValues(alpha: 0.95),
           border: Border(
-            bottom: BorderSide(color: TechColors.glowCyan.withOpacity(0.3)),
+            bottom:
+                BorderSide(color: TechColors.glowCyan.withValues(alpha: 0.3)),
           ),
         ),
         child: Row(
@@ -314,7 +280,7 @@ class _MainPageState extends State<MainPage>
                 borderRadius: BorderRadius.circular(2),
                 boxShadow: [
                   BoxShadow(
-                    color: TechColors.glowCyan.withOpacity(0.5),
+                    color: TechColors.glowCyan.withValues(alpha: 0.5),
                     blurRadius: 6,
                   ),
                 ],
@@ -350,9 +316,8 @@ class _MainPageState extends State<MainPage>
               dbLoading: _isHealthLoading,
               onRefresh: _checkHealth,
             ),
-            const SizedBox(width: 12), // 报警日志按钮
-            _buildAlarmButton(),
-            const SizedBox(width: 12), // 时钟
+            const SizedBox(width: 12),
+            // 时钟
             _buildClock(),
             const SizedBox(width: 12),
             // 窗口控制按钮
@@ -364,62 +329,57 @@ class _MainPageState extends State<MainPage>
     );
   }
 
-  /// Tab切换按钮
+  /// Tab切换按钮（移除报警日志）
   Widget _buildTabButtons() {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _buildTabButton(0, '实时监控', Icons.monitor_heart),
+        _buildTabButton(0, '实时数据'),
         const SizedBox(width: 4),
-        _buildTabButton(1, '历史数据', Icons.analytics),
+        _buildTabButton(1, '历史数据'),
         const SizedBox(width: 4),
-        _buildTabButton(2, '系统设置', Icons.settings),
+        _buildTabButton(2, '系统设置'),
         const SizedBox(width: 4),
-        _buildTabButton(3, 'DB1状态', Icons.lan),
-        const SizedBox(width: 4),
-        _buildTabButton(4, 'DB3状态', Icons.lan),
+        _buildTabButton(3, '设备状态'),
       ],
     );
   }
 
-  Widget _buildTabButton(int index, String label, IconData icon) {
-    final isSelected = _tabController.index == index;
+  Widget _buildTabButton(int index, String label) {
+    // 使用 _currentTabIndex 而不是 _tabController.index，避免未初始化错误
+    final isSelected = _currentTabIndex == index;
     final color = isSelected ? TechColors.glowCyan : TechColors.textSecondary;
 
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _tabController.animateTo(index);
-        });
+        if (mounted) {
+          setState(() {
+            _currentTabIndex = index;
+            _tabController.animateTo(index);
+          });
+        }
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
-              ? TechColors.glowCyan.withOpacity(0.15)
+              ? TechColors.glowCyan.withValues(alpha: 0.15)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(4),
           border: Border.all(
             color: isSelected
-                ? TechColors.glowCyan.withOpacity(0.5)
+                ? TechColors.glowCyan.withValues(alpha: 0.5)
                 : Colors.transparent,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ],
+        child: Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 14,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          ),
         ),
       ),
     );
@@ -445,7 +405,7 @@ class _MainPageState extends State<MainPage>
                 child: Row(
                   children: [
                     _buildPumpCardFromData(
-                        pumps.length > 0 ? pumps[0] : null, pressure),
+                        pumps.isNotEmpty ? pumps[0] : null, pressure),
                     const SizedBox(width: 4),
                     _buildPumpCardFromData(pumps.length > 1 ? pumps[1] : null),
                     const SizedBox(width: 4),
@@ -482,17 +442,17 @@ class _MainPageState extends State<MainPage>
   /// 从 PumpData 构建水泵卡片
   Widget _buildPumpCardFromData(PumpData? pump, [PressureData? pressure]) {
     if (pump == null) {
-      return Expanded(
+      return const Expanded(
         child: CustomCardWidget(
           pumpNumber: '#?',
-          power: 0.0,
-          energy: 0.0,
-          currentA: 0.0,
-          currentB: 0.0,
-          currentC: 0.0,
-          voltageA: 0.0,
-          voltageB: 0.0,
-          voltageC: 0.0,
+          pt: 0.0,
+          impEp: 0.0,
+          i0: 0.0,
+          i1: 0.0,
+          i2: 0.0,
+          ua0: 0.0,
+          ua1: 0.0,
+          ua2: 0.0,
           isRunning: false,
           vibVelocityX: 0.0,
           vibVelocityY: 0.0,
@@ -509,11 +469,30 @@ class _MainPageState extends State<MainPage>
 
     // 根据阈值配置获取颜色
     final pumpIndex = pump.id;
-    final powerColor = _thresholdProvider.getPowerColor(pumpIndex, pump.power);
-    final currentColor =
-        _thresholdProvider.getCurrentColor(pumpIndex, pump.currentAvg);
-    final vibrationColor = _thresholdProvider.getVibrationColor(
-        pumpIndex, (pump.vibVelocityX + pump.vibVelocityY + pump.vibVelocityZ) / 3);
+    final powerColor = _thresholdProvider.getPtColor(pumpIndex, pump.pt);
+    final currentColor = _thresholdProvider.getIColor(pumpIndex, pump.iAvg);
+    final voltageColor = _thresholdProvider.getUaColor(pumpIndex, pump.uaAvg);
+    // 振动速度的平均值（用于速度阈值判断）
+    final avgVibVelocity =
+        (pump.vibVelocityX + pump.vibVelocityY + pump.vibVelocityZ) / 3;
+    final speedColor =
+        _thresholdProvider.getSpeedColor(pumpIndex, avgVibVelocity);
+    // 振动位移的平均值
+    final avgVibDisplacement = (pump.vibDisplacementX +
+            pump.vibDisplacementY +
+            pump.vibDisplacementZ) /
+        3;
+    final displacementColor =
+        _thresholdProvider.getDisplacementColor(pumpIndex, avgVibDisplacement);
+    // 振动频率的平均值
+    final avgVibFrequency =
+        (pump.vibFrequencyX + pump.vibFrequencyY + pump.vibFrequencyZ) / 3;
+    final frequencyColor =
+        _thresholdProvider.getFrequencyColor(pumpIndex, avgVibFrequency);
+    // 振动速度颜色（用于振动阈值判断，与speedColor相同）
+    final vibrationColor =
+        _thresholdProvider.getVibrationColor(pumpIndex, avgVibVelocity);
+    // 压力颜色
     final pressureColor = pressure != null
         ? _thresholdProvider.getPressureColor(pressure.value)
         : null;
@@ -521,14 +500,14 @@ class _MainPageState extends State<MainPage>
     return Expanded(
       child: CustomCardWidget(
         pumpNumber: '#${pump.id}',
-        power: pump.power,
-        energy: pump.energy,
-        currentA: pump.currentA,
-        currentB: pump.currentB,
-        currentC: pump.currentC,
-        voltageA: pump.voltageA,
-        voltageB: pump.voltageB,
-        voltageC: pump.voltageC,
+        pt: pump.pt,
+        impEp: pump.impEp,
+        i0: pump.i0,
+        i1: pump.i1,
+        i2: pump.i2,
+        ua0: pump.ua0,
+        ua1: pump.ua1,
+        ua2: pump.ua2,
         isRunning: pump.isRunning,
         vibVelocityX: pump.vibVelocityX,
         vibVelocityY: pump.vibVelocityY,
@@ -543,45 +522,12 @@ class _MainPageState extends State<MainPage>
         // 阈值颜色
         powerColor: powerColor,
         currentColor: currentColor,
+        voltageColor: voltageColor,
+        speedColor: speedColor,
+        displacementColor: displacementColor,
+        frequencyColor: frequencyColor,
         vibrationColor: vibrationColor,
         pressureColor: pressureColor,
-      ),
-    );
-  }
-
-  /// 报警日志按钮
-  Widget _buildAlarmButton() {
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const AlarmLogPage()),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: TechColors.bgMedium,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: TechColors.statusWarning.withOpacity(0.3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.warning_amber_rounded,
-              color: TechColors.statusWarning,
-              size: 16,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              '报警日志',
-              style: TextStyle(
-                color: TechColors.statusWarning,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -593,11 +539,11 @@ class _MainPageState extends State<MainPage>
       decoration: BoxDecoration(
         color: TechColors.bgMedium,
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: TechColors.glowCyan.withOpacity(0.3)),
+        border: Border.all(color: TechColors.glowCyan.withValues(alpha: 0.3)),
       ),
       child: Text(
         _clockTime.isEmpty ? '--:--:--' : _clockTime,
-        style: TextStyle(
+        style: const TextStyle(
           color: TechColors.glowCyan,
           fontSize: 13,
           fontFamily: 'monospace',
@@ -668,21 +614,22 @@ class _MainPageState extends State<MainPage>
         backgroundColor: TechColors.bgDark,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: TechColors.borderDark),
+          side: const BorderSide(color: TechColors.borderDark),
         ),
-        title: Text('确认退出', style: TextStyle(color: TechColors.textPrimary)),
-        content: Text('确定要关闭应用程序吗？',
+        title:
+            const Text('确认退出', style: TextStyle(color: TechColors.textPrimary)),
+        content: const Text('确定要关闭应用程序吗？',
             style: TextStyle(color: TechColors.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child:
-                Text('取消', style: TextStyle(color: TechColors.textSecondary)),
+            child: const Text('取消',
+                style: TextStyle(color: TechColors.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => windowManager.close(),
             style: ElevatedButton.styleFrom(
-              backgroundColor: TechColors.statusAlarm.withOpacity(0.2),
+              backgroundColor: TechColors.statusAlarm.withValues(alpha: 0.2),
               foregroundColor: TechColors.statusAlarm,
             ),
             child: const Text('确认关闭'),
@@ -720,7 +667,7 @@ class _HoverBuilderState extends State<HoverBuilder> {
         duration: const Duration(milliseconds: 150),
         decoration: BoxDecoration(
           color: _isHovered
-              ? widget.hoverColor.withOpacity(0.2)
+              ? widget.hoverColor.withValues(alpha: 0.2)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(4),
         ),

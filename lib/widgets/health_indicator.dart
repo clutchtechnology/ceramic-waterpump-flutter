@@ -20,59 +20,33 @@ class HealthIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Color statusColor;
-    IconData statusIcon;
 
     if (isLoading) {
       statusColor = TechColors.statusWarning;
-      statusIcon = Icons.sync;
     } else if (isHealthy) {
-      statusColor = TechColors.statusNormal;
-      statusIcon = Icons.check_circle;
+      statusColor = TechColors.glowCyan;
     } else {
       statusColor = TechColors.statusAlarm;
-      statusIcon = Icons.error;
     }
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: statusColor.withOpacity(0.1),
+          color: TechColors.bgMedium,
           borderRadius: BorderRadius.circular(4),
           border: Border.all(
             color: statusColor.withOpacity(0.3),
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 状态图标
-            isLoading
-                ? SizedBox(
-                    width: 12,
-                    height: 12,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-                    ),
-                  )
-                : Icon(
-                    statusIcon,
-                    size: 12,
-                    color: statusColor,
-                  ),
-            const SizedBox(width: 4),
-            // 标签
-            Text(
-              label,
-              style: TextStyle(
-                color: statusColor,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
+        child: Text(
+          label,
+          style: TextStyle(
+            color: statusColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
     );
@@ -124,14 +98,17 @@ class HealthStatusBar extends StatelessWidget {
           isLoading: dbLoading,
         ),
         if (onRefresh != null) ...[
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
           GestureDetector(
             onTap: onRefresh,
             child: Container(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: TechColors.glowCyan.withOpacity(0.1),
+                color: TechColors.bgMedium,
                 borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: TechColors.glowCyan.withOpacity(0.3),
+                ),
               ),
               child: const Icon(
                 Icons.refresh,

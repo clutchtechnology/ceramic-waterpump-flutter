@@ -20,7 +20,7 @@ class ThresholdSettingsWidget extends StatefulWidget {
 
 class _ThresholdSettingsWidgetState extends State<ThresholdSettingsWidget> {
   // 当前选中的类别
-  int _selectedCategory = 0; // 0: 电流, 1: 功率, 2: 压力, 3: 振动
+  int _selectedCategory = 0; // 0: 电流, 1: 电压, 2: 水压, 3: 速度, 4: 位移, 5: 频率
 
   @override
   Widget build(BuildContext context) {
@@ -50,13 +50,11 @@ class _ThresholdSettingsWidgetState extends State<ThresholdSettingsWidget> {
         'label': '电流阈值',
         'color': TechColors.glowCyan
       },
-      {'icon': Icons.power, 'label': '功率阈值', 'color': TechColors.glowGreen},
-      {'icon': Icons.speed, 'label': '压力阈值', 'color': TechColors.glowOrange},
-      {
-        'icon': Icons.vibration,
-        'label': '振动阈值',
-        'color': const Color(0xFFaf52de)
-      },
+      {'icon': Icons.bolt, 'label': '电压阈值', 'color': TechColors.glowCyan},
+      {'icon': Icons.water_drop, 'label': '水压阈值', 'color': TechColors.glowCyan},
+      {'icon': Icons.speed, 'label': '速度阈值', 'color': TechColors.glowCyan},
+      {'icon': Icons.straighten, 'label': '位移阈值', 'color': TechColors.glowCyan},
+      {'icon': Icons.graphic_eq, 'label': '频率阈值', 'color': TechColors.glowCyan},
     ];
 
     return Container(
@@ -117,31 +115,29 @@ class _ThresholdSettingsWidgetState extends State<ThresholdSettingsWidget> {
   Widget _buildCategoryContent() {
     switch (_selectedCategory) {
       case 0:
-        return _buildCurrentConfig();
+        return _buildIConfig();
       case 1:
-        return _buildPowerConfig();
+        return _buildUaConfig();
       case 2:
         return _buildPressureConfig();
       case 3:
-        return _buildVibrationConfig();
+        return _buildSpeedConfig();
+      case 4:
+        return _buildDisplacementConfig();
+      case 5:
+        return _buildFrequencyConfig();
       default:
         return const SizedBox();
     }
   }
 
   /// 电流阈值配置
-  Widget _buildCurrentConfig() {
+  Widget _buildIConfig() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildInfoBanner(
-          '电流阈值配置',
-          '设置各水泵电流的正常和警告上限，超过警告值将显示红色报警',
-          TechColors.glowCyan,
-        ),
-        const SizedBox(height: 16),
         ...List.generate(6, (index) {
-          final config = widget.provider.currentConfigs[index];
+          final config = widget.provider.iConfigs[index];
           return _buildThresholdRow(
             label: config.displayName,
             normalMax: config.normalMax,
@@ -149,10 +145,10 @@ class _ThresholdSettingsWidgetState extends State<ThresholdSettingsWidget> {
             unit: 'A',
             color: TechColors.glowCyan,
             onNormalChanged: (value) {
-              widget.provider.updateCurrentConfig(index, normalMax: value);
+              widget.provider.updateIConfig(index, normalMax: value);
             },
             onWarningChanged: (value) {
-              widget.provider.updateCurrentConfig(index, warningMax: value);
+              widget.provider.updateIConfig(index, warningMax: value);
             },
           );
         }),
@@ -160,30 +156,100 @@ class _ThresholdSettingsWidgetState extends State<ThresholdSettingsWidget> {
     );
   }
 
-  /// 功率阈值配置
-  Widget _buildPowerConfig() {
+  /// 电压阈值配置
+  Widget _buildUaConfig() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildInfoBanner(
-          '功率阈值配置',
-          '设置各水泵功率的正常和警告上限，超过警告值将显示红色报警',
-          TechColors.glowGreen,
-        ),
-        const SizedBox(height: 16),
         ...List.generate(6, (index) {
-          final config = widget.provider.powerConfigs[index];
+          final config = widget.provider.uaConfigs[index];
           return _buildThresholdRow(
             label: config.displayName,
             normalMax: config.normalMax,
             warningMax: config.warningMax,
-            unit: 'kW',
-            color: TechColors.glowGreen,
+            unit: 'V',
+            color: TechColors.glowCyan,
             onNormalChanged: (value) {
-              widget.provider.updatePowerConfig(index, normalMax: value);
+              widget.provider.updateUaConfig(index, normalMax: value);
             },
             onWarningChanged: (value) {
-              widget.provider.updatePowerConfig(index, warningMax: value);
+              widget.provider.updateUaConfig(index, warningMax: value);
+            },
+          );
+        }),
+      ],
+    );
+  }
+
+  /// 速度阈值配置
+  Widget _buildSpeedConfig() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...List.generate(6, (index) {
+          final config = widget.provider.speedConfigs[index];
+          return _buildThresholdRow(
+            label: config.displayName,
+            normalMax: config.normalMax,
+            warningMax: config.warningMax,
+            unit: 'r/min',
+            color: TechColors.glowCyan,
+            onNormalChanged: (value) {
+              widget.provider.updateSpeedConfig(index, normalMax: value);
+            },
+            onWarningChanged: (value) {
+              widget.provider.updateSpeedConfig(index, warningMax: value);
+            },
+          );
+        }),
+      ],
+    );
+  }
+
+  /// 位移阈值配置
+  Widget _buildDisplacementConfig() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...List.generate(6, (index) {
+          final config = widget.provider.displacementConfigs[index];
+          return _buildThresholdRow(
+            label: config.displayName,
+            normalMax: config.normalMax,
+            warningMax: config.warningMax,
+            unit: 'mm',
+            color: TechColors.glowCyan,
+            onNormalChanged: (value) {
+              widget.provider.updateDisplacementConfig(index, normalMax: value);
+            },
+            onWarningChanged: (value) {
+              widget.provider
+                  .updateDisplacementConfig(index, warningMax: value);
+            },
+          );
+        }),
+      ],
+    );
+  }
+
+  /// 频率阈值配置
+  Widget _buildFrequencyConfig() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...List.generate(6, (index) {
+          final config = widget.provider.frequencyConfigs[index];
+          return _buildThresholdRow(
+            label: config.displayName,
+            normalMax: config.normalMax,
+            warningMax: config.warningMax,
+            unit: 'Hz',
+            color: TechColors.glowCyan,
+            onNormalChanged: (value) {
+              widget.provider.updateFrequencyConfig(index, normalMax: value);
+            },
+            onWarningChanged: (value) {
+              widget.provider.updateFrequencyConfig(index, warningMax: value);
             },
           );
         }),
@@ -196,168 +262,102 @@ class _ThresholdSettingsWidgetState extends State<ThresholdSettingsWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildInfoBanner(
-          '压力阈值配置 (仅1号泵)',
-          '设置压力的高低报警阈值，低于低限或高于高限将显示红色报警',
-          TechColors.glowOrange,
+        _buildPressureThresholdRow(
+          label: '高压报警',
+          value: widget.provider.pressureHighAlarm,
+          unit: 'MPa',
+          color: TechColors.glowCyan,
+          onChanged: (value) {
+            widget.provider.updatePressureConfig(highAlarm: value);
+          },
         ),
-        const SizedBox(height: 16),
-        _buildPressureRow(),
+        _buildPressureThresholdRow(
+          label: '低压报警',
+          value: widget.provider.pressureLowAlarm,
+          unit: 'MPa',
+          color: TechColors.glowCyan,
+          onChanged: (value) {
+            widget.provider.updatePressureConfig(lowAlarm: value);
+          },
+        ),
       ],
     );
   }
 
-  /// 压力配置行
-  Widget _buildPressureRow() {
+  /// 压力阈值配置行（统一样式）
+  Widget _buildPressureThresholdRow({
+    required String label,
+    required double value,
+    required String unit,
+    required Color color,
+    required ValueChanged<double> onChanged,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: TechColors.bgMedium.withOpacity(0.5),
         borderRadius: BorderRadius.circular(4),
         border: Border.all(color: TechColors.borderDark),
       ),
-      child: Column(
+      child: Row(
         children: [
-          // 高压报警
-          Row(
-            children: [
-              SizedBox(
-                width: 120,
-                child: Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: ThresholdColors.alarm,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      '高压报警',
-                      style: TextStyle(
-                          color: TechColors.textSecondary, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildNumberInput(
-                  value: widget.provider.pressureHighAlarm,
-                  onChanged: (value) {
-                    setState(() {
-                      widget.provider.updatePressureConfig(highAlarm: value);
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text('MPa',
-                  style:
-                      TextStyle(color: TechColors.textSecondary, fontSize: 12)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // 低压报警
-          Row(
-            children: [
-              SizedBox(
-                width: 120,
-                child: Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: ThresholdColors.alarm,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      '低压报警',
-                      style: TextStyle(
-                          color: TechColors.textSecondary, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildNumberInput(
-                  value: widget.provider.pressureLowAlarm,
-                  onChanged: (value) {
-                    setState(() {
-                      widget.provider.updatePressureConfig(lowAlarm: value);
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text('MPa',
-                  style:
-                      TextStyle(color: TechColors.textSecondary, fontSize: 12)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // 说明
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: TechColors.glowOrange.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: TechColors.glowOrange.withOpacity(0.3)),
-            ),
+          // 标签
+          SizedBox(
+            width: 100,
             child: Row(
               children: [
-                Icon(Icons.info_outline,
-                    color: TechColors.glowOrange, size: 16),
+                Container(
+                  width: 3,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '压力低于 ${widget.provider.pressureLowAlarm} MPa 或高于 ${widget.provider.pressureHighAlarm} MPa 时显示红色报警',
-                    style:
-                        TextStyle(color: TechColors.glowOrange, fontSize: 11),
+                    label,
+                    style: const TextStyle(
+                        color: TechColors.textPrimary, fontSize: 16),
                   ),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 12),
+          // 报警阈值标识
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: ThresholdColors.alarm,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Text('报警阈值',
+                  style:
+                      TextStyle(color: TechColors.textSecondary, fontSize: 16)),
+            ],
+          ),
+          const SizedBox(width: 8),
+          // 输入框（使用Expanded动态适应）
+          Expanded(
+            child: _buildNumberInputDynamic(
+              value: value,
+              onChanged: onChanged,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(unit,
+              style: const TextStyle(
+                  color: TechColors.textSecondary, fontSize: 16)),
         ],
       ),
-    );
-  }
-
-  /// 振动阈值配置
-  Widget _buildVibrationConfig() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildInfoBanner(
-          '振动阈值配置',
-          '设置各水泵振动幅度的正常和警告上限，超过警告值将显示红色报警',
-          const Color(0xFFaf52de),
-        ),
-        const SizedBox(height: 16),
-        ...List.generate(6, (index) {
-          final config = widget.provider.vibrationConfigs[index];
-          return _buildThresholdRow(
-            label: config.displayName,
-            normalMax: config.normalMax,
-            warningMax: config.warningMax,
-            unit: 'mm/s',
-            color: const Color(0xFFaf52de),
-            onNormalChanged: (value) {
-              widget.provider.updateVibrationConfig(index, normalMax: value);
-            },
-            onWarningChanged: (value) {
-              widget.provider.updateVibrationConfig(index, warningMax: value);
-            },
-          );
-        }),
-      ],
     );
   }
 
@@ -466,7 +466,7 @@ class _ThresholdSettingsWidgetState extends State<ThresholdSettingsWidget> {
                   child: Text(
                     label,
                     style: const TextStyle(
-                        color: TechColors.textPrimary, fontSize: 12),
+                        color: TechColors.textPrimary, fontSize: 16),
                   ),
                 ),
               ],
@@ -487,16 +487,13 @@ class _ThresholdSettingsWidgetState extends State<ThresholdSettingsWidget> {
               const SizedBox(width: 4),
               const Text('正常上限',
                   style:
-                      TextStyle(color: TechColors.textSecondary, fontSize: 11)),
+                      TextStyle(color: TechColors.textSecondary, fontSize: 16)),
             ],
           ),
           const SizedBox(width: 8),
-          SizedBox(
-            width: 80,
-            child: _buildNumberInput(
-              value: normalMax,
-              onChanged: onNormalChanged,
-            ),
+          _buildNumberInput(
+            value: normalMax,
+            onChanged: onNormalChanged,
           ),
           // 警告上限
           const SizedBox(width: 16),
@@ -513,34 +510,190 @@ class _ThresholdSettingsWidgetState extends State<ThresholdSettingsWidget> {
               const SizedBox(width: 4),
               const Text('警告上限',
                   style:
-                      TextStyle(color: TechColors.textSecondary, fontSize: 11)),
+                      TextStyle(color: TechColors.textSecondary, fontSize: 16)),
             ],
           ),
           const SizedBox(width: 8),
-          SizedBox(
-            width: 80,
-            child: _buildNumberInput(
-              value: warningMax,
-              onChanged: onWarningChanged,
-            ),
+          _buildNumberInput(
+            value: warningMax,
+            onChanged: onWarningChanged,
           ),
           const SizedBox(width: 8),
           Text(unit,
               style: const TextStyle(
-                  color: TechColors.textSecondary, fontSize: 11)),
+                  color: TechColors.textSecondary, fontSize: 16)),
         ],
       ),
     );
   }
 
-  /// 数字输入框
+  /// 数字输入框（带增减按钮 - 固定宽度）
   Widget _buildNumberInput({
     required double value,
     required ValueChanged<double> onChanged,
   }) {
-    return _NumberInputField(
-      value: value,
-      onChanged: onChanged,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 减少按钮
+        SizedBox(
+          width: 44,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                final newValue = value - 1;
+                if (newValue >= 0) {
+                  onChanged(newValue);
+                }
+              },
+              borderRadius: BorderRadius.circular(2),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: TechColors.bgMedium,
+                  borderRadius: BorderRadius.circular(2),
+                  border: Border.all(color: TechColors.borderDark),
+                ),
+                child: const Center(
+                  child: Text(
+                    '-',
+                    style: TextStyle(
+                      color: TechColors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        // 输入框
+        SizedBox(
+          width: 64,
+          child: _NumberInputField(
+            value: value,
+            onChanged: onChanged,
+          ),
+        ),
+        const SizedBox(width: 4),
+        // 增加按钮
+        SizedBox(
+          width: 44,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                final newValue = value + 1;
+                onChanged(newValue);
+              },
+              borderRadius: BorderRadius.circular(2),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: TechColors.bgMedium,
+                  borderRadius: BorderRadius.circular(2),
+                  border: Border.all(color: TechColors.borderDark),
+                ),
+                child: const Center(
+                  child: Text(
+                    '+',
+                    style: TextStyle(
+                      color: TechColors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 数字输入框（带增减按钮 - 动态宽度，用于压力配置）
+  Widget _buildNumberInputDynamic({
+    required double value,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Row(
+      children: [
+        // 减少按钮
+        SizedBox(
+          width: 50,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                final newValue = value - 1;
+                if (newValue >= 0) {
+                  onChanged(newValue);
+                }
+              },
+              borderRadius: BorderRadius.circular(2),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: TechColors.bgMedium,
+                  borderRadius: BorderRadius.circular(2),
+                  border: Border.all(color: TechColors.borderDark),
+                ),
+                child: const Center(
+                  child: Text(
+                    '-',
+                    style: TextStyle(
+                      color: TechColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        // 输入框（动态宽度）
+        Expanded(
+          child: _NumberInputField(
+            value: value,
+            onChanged: onChanged,
+          ),
+        ),
+        const SizedBox(width: 6),
+        // 增加按钮
+        SizedBox(
+          width: 50,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                final newValue = value + 1;
+                onChanged(newValue);
+              },
+              borderRadius: BorderRadius.circular(2),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: TechColors.bgMedium,
+                  borderRadius: BorderRadius.circular(2),
+                  border: Border.all(color: TechColors.borderDark),
+                ),
+                child: const Center(
+                  child: Text(
+                    '+',
+                    style: TextStyle(
+                      color: TechColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -652,7 +805,7 @@ class _NumberInputFieldState extends State<_NumberInputField> {
       ],
       style: const TextStyle(
         color: TechColors.textPrimary,
-        fontSize: 12,
+        fontSize: 16,
         fontFamily: 'Roboto Mono',
       ),
       textAlign: TextAlign.center,

@@ -41,7 +41,10 @@ class SensorStatusService {
 
     // 连接 WebSocket (如果尚未连接)
     if (_wsService.state != WebSocketState.connected) {
-      _wsService.connect();
+      _wsService.connect().then((_) {
+        // 连接成功后订阅设备状态
+        _wsService.subscribeDeviceStatus();
+      });
     } else {
       _wsService.subscribeDeviceStatus();
     }

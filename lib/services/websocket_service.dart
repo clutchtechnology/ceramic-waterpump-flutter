@@ -10,6 +10,7 @@ import 'dart:io';
 import '../api/api.dart';
 import '../models/pump_data.dart';
 import '../models/sensor_status_model.dart';
+import '../utils/app_logger.dart';
 
 // ============================================================
 // 1, WebSocket 连接状态枚举
@@ -79,10 +80,6 @@ class WebSocketService {
   // 13, WebSocket URL (可动态配置)
   String _wsUrl = Api.wsUrl;
 
-  // 14, 消息接收计数器 (用于日志)
-  int _messageReceivedCount = 0;
-  DateTime? _lastMessageTime;
-
   // ============================================================
   // 回调函数
   // ============================================================
@@ -148,6 +145,9 @@ class WebSocketService {
 
       // 18.6, 发送初始订阅消息
       _sendSubscribe();
+      
+      print('[WebSocket] 连接成功: $_wsUrl');
+      AppLogger.warning('[WebSocket] 连接成功: $_wsUrl');
     } catch (e) {
       _logError('连接失败: $e');
       _updateState(WebSocketState.disconnected);
@@ -234,20 +234,8 @@ class WebSocketService {
     if (_isDisposed) return;
 
     try {
-      _messageReceivedCount++;
-      final now = DateTime.now();
-      final interval = _lastMessageTime != null 
-          ? now.difference(_lastMessageTime!).inMilliseconds 
-          : 0;
-      _lastMessageTime = now;
-
       final message = jsonDecode(data as String) as Map<String, dynamic>;
       final type = message['type'] as String?;
-
-      // 每 10 条消息打印一次日志
-      if (_messageReceivedCount % 10 == 0) {
-        print('[WebSocket] 收到第 $_messageReceivedCount 条消息 (类型: $type)，间隔: ${interval}ms');
-      }
 
       switch (type) {
         case WsMessageType.realtimeData:
@@ -286,6 +274,9 @@ class WebSocketService {
       // 28.3, 调用回调
       onRealtimeDataUpdate?.call(response);
     } catch (e, stackTrace) {
+      // 记录到日志文件
+      AppLogger.error('[WebSocket] 实时数据解析失败: $e', e, stackTrace);
+      
       // 强制打印错误，不受频率控制
       print('[WebSocket] 实时数据解析失败: $e');
       print('[WebSocket] 消息内容: $message');
@@ -298,6 +289,9 @@ class WebSocketService {
     try {
       final response = DeviceStatusResponse.fromJson(message);
       
+      // 打印设备状态更新日志
+      print('[WebSocket] 收到设备状态更新: ${response.summary?.total ?? 0} 个设备');
+      
       // 检查回调是否设置
       if (onDeviceStatusUpdate == null) {
         // device_status 回调未设置是正常的，不打印警告
@@ -306,6 +300,7 @@ class WebSocketService {
       
       onDeviceStatusUpdate?.call(response);
     } catch (e, stackTrace) {
+      AppLogger.error('[WebSocket] 设备状态解析失败: $e', e, stackTrace);
       _logError('设备状态解析失败: $e');
       print('[WebSocket] 堆栈跟踪: $stackTrace');
     }
@@ -313,6 +308,7 @@ class WebSocketService {
 
   /// 30, WebSocket 错误回调
   void _onSocketError(dynamic error) {
+    AppLogger.error('[WebSocket] Socket 错误: $error', error);
     _logError('WebSocket 错误: $error');
     _handleDisconnect();
   }
@@ -326,6 +322,7 @@ class WebSocketService {
   void _handleDisconnect() {
     if (_isDisposed) return;
 
+    AppLogger.warning('[WebSocket] 连接断开，准备重连');
     _stopHeartbeat();
     _closeSocket();
     _updateState(WebSocketState.disconnected);
@@ -397,7 +394,8 @@ class WebSocketService {
   /// 39, 发送初始订阅
   void _sendSubscribe() {
     subscribeRealtime();
-    subscribeDeviceStatus();
+    // 不自动订阅 device_status，由需要的页面手动订阅
+    // subscribeDeviceStatus();
   }
 
   /// 40, 更新连接状态
@@ -412,11 +410,16 @@ class WebSocketService {
   static int _errorCount = 0;
   void _logError(String message) {
     _errorCount++;
-    // 前 3 次 + 每 10 次打印
+    
+    // 记录到日志文件
+    AppLogger.error('[WebSocket] $_errorCount: $message');
+    
+    // 前 3 次 + 每 10 次打印到控制台
     if (_errorCount <= 3 || _errorCount % 10 == 0) {
       // ignore: avoid_print
       print('[WebSocket] $_errorCount: $message');
     }
+    
     onError?.call(message);
   }
 }
