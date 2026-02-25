@@ -135,11 +135,11 @@ Future<void> connect() async {
 // 功能: 单例 WebSocket 连接管理，支持自动重连、心跳检测、消息分发
 ```
 
-#### 2.1 禁止使用 Emoji 表情符号 ⚠️
+#### 2.1 禁止使用 Emoji 表情符号 
 
 **原则**: 注释中不使用任何 emoji 图标或表情符号，保持代码的专业性和可读性。
 
-✅ **正确的注释**：
+ **正确的注释**：
 ```dart
 // 1. 初始化 WebSocket 服务
 // 注意：这里需要检查连接状态
@@ -148,14 +148,14 @@ Future<void> connect() async {
 // 错误：连接失败
 ```
 
-❌ **错误的注释（禁止使用）**：
+ **错误的注释（禁止使用）**：
 ```dart
-// 🚀 初始化 WebSocket 服务
-// ⚠️ 注意：这里需要检查连接状态
-// ❌ 错误：连接失败
-// ✅ 成功：连接建立完成
-// 🔥 重要：性能优化
-// 💡 提示：可以使用缓存
+//  初始化 WebSocket 服务
+//  注意：这里需要检查连接状态
+//  错误：连接失败
+//  成功：连接建立完成
+//  重要：性能优化
+//  提示：可以使用缓存
 ```
 
 **原因说明**：
@@ -172,7 +172,7 @@ Future<void> connect() async {
 - **避免冗余方法**：一个文件不要抽象出太多方法，保持简洁
 - **实用主义**：能直接写就直接写，不要为了"优雅"而过度封装
 
-✅ **好的做法**：
+ **好的做法**：
 ```dart
 // 1. 更新显示数据
 void updateDisplay(RealtimeBatchResponse data) {
@@ -185,7 +185,7 @@ void updateDisplay(RealtimeBatchResponse data) {
 }
 ```
 
-❌ **过度抽象**：
+ **过度抽象**：
 ```dart
 String _formatVoltage(double voltage) {
   return '${voltage.toStringAsFixed(1)} V';
@@ -214,7 +214,7 @@ void updateDisplay(RealtimeBatchResponse data) {
 ### 4. WebSocket 使用规范
 
 ```dart
-// ✅ 正确：在 initState 中初始化 WebSocket
+//  正确：在 initState 中初始化 WebSocket
 @override
 void initState() {
   super.initState();
@@ -224,14 +224,14 @@ void initState() {
   _wsService.connect();
 }
 
-// ✅ 正确：在 dispose 中释放资源
+//  正确：在 dispose 中释放资源
 @override
 void dispose() {
   _wsService.dispose();
   super.dispose();
 }
 
-// ✅ 正确：处理连接状态变化
+//  正确：处理连接状态变化
 void _handleStateChanged(WebSocketState state) {
   if (mounted) {
     setState(() {
@@ -240,7 +240,7 @@ void _handleStateChanged(WebSocketState state) {
   }
 }
 
-// ❌ 错误：不检查 mounted 状态
+//  错误：不检查 mounted 状态
 void _handleRealtimeData(RealtimeBatchResponse data) {
   setState(() {  // 可能在 dispose 后调用
     _data = data;
@@ -251,7 +251,7 @@ void _handleRealtimeData(RealtimeBatchResponse data) {
 ### 2. 状态管理规范
 
 ```dart
-// ✅ 正确：使用 StatefulWidget + setState
+//  正确：使用 StatefulWidget + setState
 class MyWidget extends StatefulWidget {
   @override
   State<MyWidget> createState() => _MyWidgetState();
@@ -269,7 +269,7 @@ class _MyWidgetState extends State<MyWidget> {
   }
 }
 
-// ✅ 正确：使用 Provider (可选)
+//  正确：使用 Provider (可选)
 class ThresholdConfigProvider extends ChangeNotifier {
   Map<String, dynamic> _config = {};
   
@@ -279,14 +279,14 @@ class ThresholdConfigProvider extends ChangeNotifier {
   }
 }
 
-// ❌ 错误：直接修改状态不调用 setState
+//  错误：直接修改状态不调用 setState
 _data = newData;  // UI 不会更新
 ```
 
 ### 3. 异步操作规范
 
 ```dart
-// ✅ 正确：使用 async/await
+//  正确：使用 async/await
 Future<void> _loadData() async {
   try {
     final response = await HistoryService.queryHistory(
@@ -304,7 +304,7 @@ Future<void> _loadData() async {
   }
 }
 
-// ✅ 正确：使用 FutureBuilder
+//  正确：使用 FutureBuilder
 FutureBuilder<HealthResponse>(
   future: HealthService.checkHealth(),
   builder: (context, snapshot) {
@@ -315,14 +315,14 @@ FutureBuilder<HealthResponse>(
   },
 )
 
-// ❌ 错误：不处理异常
+//  错误：不处理异常
 final data = await api.getData();  // 可能抛出异常
 ```
 
 ### 4. UI 布局规范
 
 ```dart
-// ✅ 正确：使用固定尺寸布局
+//  正确：使用固定尺寸布局
 Container(
   width: 1280,
   height: 800,
@@ -334,7 +334,7 @@ Container(
   ),
 )
 
-// ✅ 正确：使用 Expanded 分配剩余空间
+//  正确：使用 Expanded 分配剩余空间
 Row(
   children: [
     SizedBox(width: 200, child: Sidebar()),
@@ -342,14 +342,14 @@ Row(
   ],
 )
 
-// ❌ 错误：使用响应式布局
+//  错误：使用响应式布局
 MediaQuery.of(context).size.width  // 不需要，固定 1280
 ```
 
 ### 5. 颜色和样式规范
 
 ```dart
-// ✅ 正确：使用 TechColors 常量
+//  正确：使用 TechColors 常量
 import '../utils/constants.dart';
 
 Container(
@@ -359,13 +359,13 @@ Container(
   ),
 )
 
-// ✅ 正确：使用自定义组件
+//  正确：使用自定义组件
 CustomCardWidget(
   title: '1#水泵',
   child: PumpDataDisplay(),
 )
 
-// ❌ 错误：硬编码颜色
+//  错误：硬编码颜色
 Container(
   color: Color(0xFF00D4FF),  // 应使用 TechColors.primary
 )
@@ -374,7 +374,7 @@ Container(
 ### 6. 错误处理规范
 
 ```dart
-// ✅ 正确：显示用户友好的错误信息
+//  正确：显示用户友好的错误信息
 void _showError(String message) {
   if (mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -387,12 +387,12 @@ void _showError(String message) {
   }
 }
 
-// ✅ 正确：WebSocket 错误处理
+//  正确：WebSocket 错误处理
 _wsService.onError = (error) {
   _showError('连接错误: $error');
 };
 
-// ❌ 错误：忽略错误
+//  错误：忽略错误
 try {
   await api.getData();
 } catch (e) {
@@ -478,24 +478,24 @@ await ThresholdService.updateConfig(newConfig);
 ### 1. WebSocket 连接管理
 
 ```dart
-// ✅ 正确：单例模式，全局共享连接
+//  正确：单例模式，全局共享连接
 final wsService = WebSocketService();
 
-// ✅ 正确：页面切换时不断开连接
+//  正确：页面切换时不断开连接
 @override
 void dispose() {
   // 不调用 wsService.disconnect()
   super.dispose();
 }
 
-// ❌ 错误：每个页面创建新连接
+//  错误：每个页面创建新连接
 final wsService = WebSocketService()..connect();  // 会创建多个连接
 ```
 
 ### 2. UI 更新优化
 
 ```dart
-// ✅ 正确：使用 ValueNotifier 减少重建
+//  正确：使用 ValueNotifier 减少重建
 class MyWidget extends StatefulWidget {
   @override
   State<MyWidget> createState() => _MyWidgetState();
@@ -515,7 +515,7 @@ class _MyWidgetState extends State<MyWidget> {
   }
 }
 
-// ❌ 错误：频繁调用 setState 重建整个页面
+//  错误：频繁调用 setState 重建整个页面
 void _updateData(data) {
   setState(() {  // 重建整个页面
     _allData = data;
@@ -526,7 +526,7 @@ void _updateData(data) {
 ### 3. 图表性能优化
 
 ```dart
-// ✅ 正确：限制数据点数量
+//  正确：限制数据点数量
 List<FlSpot> _prepareChartData(List<HistoryPoint> data) {
   if (data.length > 100) {
     // 采样：每 N 个点取 1 个
@@ -539,7 +539,7 @@ List<FlSpot> _prepareChartData(List<HistoryPoint> data) {
   return data.map((point) => FlSpot(point.x, point.y)).toList();
 }
 
-// ❌ 错误：显示所有数据点
+//  错误：显示所有数据点
 final spots = data.map((p) => FlSpot(p.x, p.y)).toList();  // 可能有 10000+ 个点
 ```
 

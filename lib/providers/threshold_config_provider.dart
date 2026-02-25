@@ -543,7 +543,7 @@ class ThresholdConfigProvider extends ChangeNotifier {
       // 同步到后端 (await 确保同步完成)
       final syncSuccess = await _syncToBackend();
       if (!syncSuccess) {
-        debugPrint('⚠️ 本地保存成功，但后端同步失败');
+        debugPrint(' 本地保存成功，但后端同步失败');
       }
 
       return true;
@@ -563,14 +563,14 @@ class ThresholdConfigProvider extends ChangeNotifier {
           await apiClient.post(Api.thresholds, body: backendConfig);
 
       if (response != null && response['success'] == true) {
-        debugPrint('✅ 阈值配置已同步到后端');
+        debugPrint(' 阈值配置已同步到后端');
         return true;
       } else {
-        debugPrint('⚠️ 后端同步失败: ${response?['error']}');
+        debugPrint(' 后端同步失败: ${response?['error']}');
         return false;
       }
     } catch (e) {
-      debugPrint('⚠️ 后端同步异常: $e');
+      debugPrint(' 后端同步异常: $e');
       return false;
     }
   }

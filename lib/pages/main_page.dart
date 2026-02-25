@@ -391,6 +391,12 @@ class _MainPageState extends State<MainPage>
     final pumps =
         _realtimeData?.pumps ?? List.generate(6, (i) => PumpData.empty(i + 1));
     final pressure = _realtimeData?.pressure;
+    final vibrations = _realtimeData?.vibrations ?? [];
+
+    // 根据索引获取对应振动数据 (pump 1-6 对应 vib 0-5)
+    VibrationData? getVib(int pumpIndex) {
+      return pumpIndex < vibrations.length ? vibrations[pumpIndex] : null;
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -404,12 +410,14 @@ class _MainPageState extends State<MainPage>
                 padding: const EdgeInsets.all(4),
                 child: Row(
                   children: [
+                    _buildPumpCardFromData(pumps.isNotEmpty ? pumps[0] : null,
+                        pressure, getVib(0)),
+                    const SizedBox(width: 4),
                     _buildPumpCardFromData(
-                        pumps.isNotEmpty ? pumps[0] : null, pressure),
+                        pumps.length > 1 ? pumps[1] : null, null, getVib(1)),
                     const SizedBox(width: 4),
-                    _buildPumpCardFromData(pumps.length > 1 ? pumps[1] : null),
-                    const SizedBox(width: 4),
-                    _buildPumpCardFromData(pumps.length > 2 ? pumps[2] : null),
+                    _buildPumpCardFromData(
+                        pumps.length > 2 ? pumps[2] : null, null, getVib(2)),
                   ],
                 ),
               ),
@@ -424,11 +432,14 @@ class _MainPageState extends State<MainPage>
                 padding: const EdgeInsets.all(4),
                 child: Row(
                   children: [
-                    _buildPumpCardFromData(pumps.length > 3 ? pumps[3] : null),
+                    _buildPumpCardFromData(
+                        pumps.length > 3 ? pumps[3] : null, null, getVib(3)),
                     const SizedBox(width: 4),
-                    _buildPumpCardFromData(pumps.length > 4 ? pumps[4] : null),
+                    _buildPumpCardFromData(
+                        pumps.length > 4 ? pumps[4] : null, null, getVib(4)),
                     const SizedBox(width: 4),
-                    _buildPumpCardFromData(pumps.length > 5 ? pumps[5] : null),
+                    _buildPumpCardFromData(
+                        pumps.length > 5 ? pumps[5] : null, null, getVib(5)),
                   ],
                 ),
               ),
@@ -440,7 +451,8 @@ class _MainPageState extends State<MainPage>
   }
 
   /// 从 PumpData 构建水泵卡片
-  Widget _buildPumpCardFromData(PumpData? pump, [PressureData? pressure]) {
+  Widget _buildPumpCardFromData(PumpData? pump,
+      [PressureData? pressure, VibrationData? vib]) {
     if (pump == null) {
       return const Expanded(
         child: CustomCardWidget(
@@ -467,26 +479,32 @@ class _MainPageState extends State<MainPage>
       );
     }
 
+    // 从 VibrationData 提取振动字段 (pump 5-6 无振动传感器，默认 0)
+    final vibVx = vib?.vx ?? 0.0;
+    final vibVy = vib?.vy ?? 0.0;
+    final vibVz = vib?.vz ?? 0.0;
+    final vibDx = vib?.dx ?? 0.0;
+    final vibDy = vib?.dy ?? 0.0;
+    final vibDz = vib?.dz ?? 0.0;
+    final vibHzx = vib?.hzx ?? 0.0;
+    final vibHzy = vib?.hzy ?? 0.0;
+    final vibHzz = vib?.hzz ?? 0.0;
+
     // 根据阈值配置获取颜色
     final pumpIndex = pump.id;
     final powerColor = _thresholdProvider.getPtColor(pumpIndex, pump.pt);
     final currentColor = _thresholdProvider.getIColor(pumpIndex, pump.iAvg);
     final voltageColor = _thresholdProvider.getUaColor(pumpIndex, pump.uaAvg);
     // 振动速度的平均值（用于速度阈值判断）
-    final avgVibVelocity =
-        (pump.vibVelocityX + pump.vibVelocityY + pump.vibVelocityZ) / 3;
+    final avgVibVelocity = (vibVx + vibVy + vibVz) / 3;
     final speedColor =
         _thresholdProvider.getSpeedColor(pumpIndex, avgVibVelocity);
     // 振动位移的平均值
-    final avgVibDisplacement = (pump.vibDisplacementX +
-            pump.vibDisplacementY +
-            pump.vibDisplacementZ) /
-        3;
+    final avgVibDisplacement = (vibDx + vibDy + vibDz) / 3;
     final displacementColor =
         _thresholdProvider.getDisplacementColor(pumpIndex, avgVibDisplacement);
     // 振动频率的平均值
-    final avgVibFrequency =
-        (pump.vibFrequencyX + pump.vibFrequencyY + pump.vibFrequencyZ) / 3;
+    final avgVibFrequency = (vibHzx + vibHzy + vibHzz) / 3;
     final frequencyColor =
         _thresholdProvider.getFrequencyColor(pumpIndex, avgVibFrequency);
     // 振动速度颜色（用于振动阈值判断，与speedColor相同）
@@ -509,15 +527,15 @@ class _MainPageState extends State<MainPage>
         ua1: pump.ua1,
         ua2: pump.ua2,
         isRunning: pump.isRunning,
-        vibVelocityX: pump.vibVelocityX,
-        vibVelocityY: pump.vibVelocityY,
-        vibVelocityZ: pump.vibVelocityZ,
-        vibDisplacementX: pump.vibDisplacementX,
-        vibDisplacementY: pump.vibDisplacementY,
-        vibDisplacementZ: pump.vibDisplacementZ,
-        vibFrequencyX: pump.vibFrequencyX,
-        vibFrequencyY: pump.vibFrequencyY,
-        vibFrequencyZ: pump.vibFrequencyZ,
+        vibVelocityX: vibVx,
+        vibVelocityY: vibVy,
+        vibVelocityZ: vibVz,
+        vibDisplacementX: vibDx,
+        vibDisplacementY: vibDy,
+        vibDisplacementZ: vibDz,
+        vibFrequencyX: vibHzx,
+        vibFrequencyY: vibHzy,
+        vibFrequencyZ: vibHzz,
         pressure: pressure?.value, // 仅 #1 水泵传入压力
         // 阈值颜色
         powerColor: powerColor,

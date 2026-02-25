@@ -66,21 +66,21 @@ class HistoryDataPageState extends State<HistoryDataPage> {
   bool _pressureLoading = false;
 
   // 6. 振动速度 (三轴)
-  int _velocitySelectedPump = 1;
+  int _velocitySelectedVib = 1; // 改为振动传感器编号
   late DateTime _velocityStartTime;
   late DateTime _velocityEndTime;
   Map<String, List<FlSpot>> _velocityData = {};
   bool _velocityLoading = false;
 
   // 7. 振动位移 (三轴)
-  int _displacementSelectedPump = 1;
+  int _displacementSelectedVib = 1; // 改为振动传感器编号
   late DateTime _displacementStartTime;
   late DateTime _displacementEndTime;
   Map<String, List<FlSpot>> _displacementData = {};
   bool _displacementLoading = false;
 
   // 8. 振动频率 (三轴)
-  int _frequencySelectedPump = 1;
+  int _frequencySelectedVib = 1; // 改为振动传感器编号
   late DateTime _frequencyStartTime;
   late DateTime _frequencyEndTime;
   Map<String, List<FlSpot>> _frequencyData = {};
@@ -269,7 +269,7 @@ class HistoryDataPageState extends State<HistoryDataPage> {
     setState(() => _velocityLoading = true);
     try {
       final response = await _historyService.fetchThreeAxisVelocityHistory(
-        pumpId: _velocitySelectedPump,
+        vibId: _velocitySelectedVib, // 使用振动传感器编号 (1-6)
         start: _velocityStartTime,
         end: _velocityEndTime,
       );
@@ -290,7 +290,7 @@ class HistoryDataPageState extends State<HistoryDataPage> {
     setState(() => _displacementLoading = true);
     try {
       final response = await _historyService.fetchThreeAxisDisplacementHistory(
-        pumpId: _displacementSelectedPump,
+        vibId: _displacementSelectedVib, // 使用振动传感器编号 (1-6)
         start: _displacementStartTime,
         end: _displacementEndTime,
       );
@@ -311,7 +311,7 @@ class HistoryDataPageState extends State<HistoryDataPage> {
     setState(() => _frequencyLoading = true);
     try {
       final response = await _historyService.fetchThreeAxisFrequencyHistory(
-        pumpId: _frequencySelectedPump,
+        vibId: _frequencySelectedVib, // 使用振动传感器编号 (1-6)
         start: _frequencyStartTime,
         end: _frequencyEndTime,
       );
@@ -749,10 +749,10 @@ class HistoryDataPageState extends State<HistoryDataPage> {
       accentColor: TechColors.glowCyan,
       yAxisLabel: 'mm/s',
       showPumpSelector: true,
-      selectedPump: _velocitySelectedPump,
-      onPumpChanged: (pump) {
-        if (pump != null) {
-          setState(() => _velocitySelectedPump = pump);
+      selectedPump: _velocitySelectedVib,
+      onPumpChanged: (vib) {
+        if (vib != null) {
+          setState(() => _velocitySelectedVib = vib);
           _refreshVelocityData();
         }
       },
@@ -772,10 +772,10 @@ class HistoryDataPageState extends State<HistoryDataPage> {
       accentColor: TechColors.glowCyan,
       yAxisLabel: 'μm',
       showPumpSelector: true,
-      selectedPump: _displacementSelectedPump,
-      onPumpChanged: (pump) {
-        if (pump != null) {
-          setState(() => _displacementSelectedPump = pump);
+      selectedPump: _displacementSelectedVib,
+      onPumpChanged: (vib) {
+        if (vib != null) {
+          setState(() => _displacementSelectedVib = vib);
           _refreshDisplacementData();
         }
       },
@@ -795,10 +795,10 @@ class HistoryDataPageState extends State<HistoryDataPage> {
       accentColor: TechColors.glowCyan,
       yAxisLabel: 'Hz',
       showPumpSelector: true,
-      selectedPump: _frequencySelectedPump,
-      onPumpChanged: (pump) {
-        if (pump != null) {
-          setState(() => _frequencySelectedPump = pump);
+      selectedPump: _frequencySelectedVib,
+      onPumpChanged: (vib) {
+        if (vib != null) {
+          setState(() => _frequencySelectedVib = vib);
           _refreshFrequencyData();
         }
       },

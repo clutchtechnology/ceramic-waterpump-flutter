@@ -435,7 +435,7 @@ class CustomCardWidget extends StatelessWidget {
     );
   }
 
-  /// 振动速度数据项 - 格式：轴 + 数值 + 单位
+  /// 振动速度数据项 - 格式：V + 轴 + 数值 + 单位
   Widget _buildVibVelocityItem(String axis, double value) {
     final color = speedColor ?? TechColors.glowGreen;
     return FittedBox(
@@ -444,10 +444,8 @@ class CustomCardWidget extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.vibration, size: 18, color: color),
-          const SizedBox(width: 3),
           Text(
-            '$axis:',
+            'V$axis:',
             style: TextStyle(
               color: color,
               fontSize: 18,
@@ -476,7 +474,7 @@ class CustomCardWidget extends StatelessWidget {
     );
   }
 
-  /// 振动位移数据项 - 格式：轴 + 数值 + 单位
+  /// 振动位移数据项 - 格式：D + 轴 + 数值 + 单位
   Widget _buildVibDisplacementItem(String axis, double value) {
     final color = displacementColor ?? TechColors.glowGreen;
     return FittedBox(
@@ -485,10 +483,8 @@ class CustomCardWidget extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.straighten, size: 18, color: color),
-          const SizedBox(width: 3),
           Text(
-            '$axis:',
+            'D$axis:',
             style: TextStyle(
               color: color,
               fontSize: 18,
@@ -497,7 +493,7 @@ class CustomCardWidget extends StatelessWidget {
           ),
           const SizedBox(width: 2),
           Text(
-            value.toStringAsFixed(1),
+            value.toStringAsFixed(2),
             style: TextStyle(
               color: color,
               fontSize: 20,
@@ -517,7 +513,7 @@ class CustomCardWidget extends StatelessWidget {
     );
   }
 
-  /// 振动频率数据项 - 格式：轴 + 数值 + 单位
+  /// 振动频率数据项 - 格式：HZ + 轴 + 数值 + 单位
   Widget _buildVibFrequencyItem(String axis, double value) {
     final color = frequencyColor ?? TechColors.glowGreen;
     return FittedBox(
@@ -526,10 +522,8 @@ class CustomCardWidget extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.graphic_eq, size: 18, color: color),
-          const SizedBox(width: 3),
           Text(
-            '$axis:',
+            'HZ$axis:',
             style: TextStyle(
               color: color,
               fontSize: 18,

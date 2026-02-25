@@ -410,27 +410,29 @@ class HistoryService {
     );
   }
 
-  /// 获取三轴振动速度历史数据 (单个水泵)
+  /// 获取三轴振动速度历史数据 (单个振动传感器，DB4)
   /// 返回 Map: {'X': [数据点], 'Y': [数据点], 'Z': [数据点]}
+  /// vibId: 振动传感器编号 (1-6)
   Future<Map<String, List<HistoryDataPoint>>> fetchThreeAxisVelocityHistory({
-    required int pumpId,
+    required int vibId,
     required DateTime start,
     required DateTime end,
     String? interval,
   }) async {
     final results = <String, List<HistoryDataPoint>>{};
 
-    // 并行查询三轴速度
-    final futures = ['vib_velocity_x', 'vib_velocity_y', 'vib_velocity_z']
-        .map((param) async {
+    // 并行查询三轴速度 (DB4 字段名: vx, vy, vz)
+    final futures = ['vx', 'vy', 'vz'].map((param) async {
       final response = await fetchHistory(
-        pumpId: pumpId,
+        pumpId: vibId, // 使用 vibId 作为 device_id
         parameter: param,
         start: start,
         end: end,
         interval: interval,
       );
-      return MapEntry(param.split('_').last.toUpperCase(), response.data);
+      // vx->X, vy->Y, vz->Z
+      final axisMap = {'vx': 'X', 'vy': 'Y', 'vz': 'Z'};
+      return MapEntry(axisMap[param]!, response.data);
     });
 
     final entries = await Future.wait(futures);
@@ -441,31 +443,30 @@ class HistoryService {
     return results;
   }
 
-  /// 获取三轴振动位移历史数据 (单个水泵)
+  /// 获取三轴振动位移历史数据 (单个振动传感器，DB4)
   /// 返回 Map: {'X': [数据点], 'Y': [数据点], 'Z': [数据点]}
+  /// vibId: 振动传感器编号 (1-6)
   Future<Map<String, List<HistoryDataPoint>>>
       fetchThreeAxisDisplacementHistory({
-    required int pumpId,
+    required int vibId,
     required DateTime start,
     required DateTime end,
     String? interval,
   }) async {
     final results = <String, List<HistoryDataPoint>>{};
 
-    // 并行查询三轴位移
-    final futures = [
-      'vib_displacement_x',
-      'vib_displacement_y',
-      'vib_displacement_z'
-    ].map((param) async {
+    // 并行查询三轴位移 (DB4 字段名: dx, dy, dz)
+    final futures = ['dx', 'dy', 'dz'].map((param) async {
       final response = await fetchHistory(
-        pumpId: pumpId,
+        pumpId: vibId, // 使用 vibId 作为 device_id
         parameter: param,
         start: start,
         end: end,
         interval: interval,
       );
-      return MapEntry(param.split('_').last.toUpperCase(), response.data);
+      // dx->X, dy->Y, dz->Z
+      final axisMap = {'dx': 'X', 'dy': 'Y', 'dz': 'Z'};
+      return MapEntry(axisMap[param]!, response.data);
     });
 
     final entries = await Future.wait(futures);
@@ -476,27 +477,29 @@ class HistoryService {
     return results;
   }
 
-  /// 获取三轴振动频率历史数据 (单个水泵)
+  /// 获取三轴振动频率历史数据 (单个振动传感器，DB4)
   /// 返回 Map: {'X': [数据点], 'Y': [数据点], 'Z': [数据点]}
+  /// vibId: 振动传感器编号 (1-6)
   Future<Map<String, List<HistoryDataPoint>>> fetchThreeAxisFrequencyHistory({
-    required int pumpId,
+    required int vibId,
     required DateTime start,
     required DateTime end,
     String? interval,
   }) async {
     final results = <String, List<HistoryDataPoint>>{};
 
-    // 并行查询三轴频率
-    final futures = ['vib_frequency_x', 'vib_frequency_y', 'vib_frequency_z']
-        .map((param) async {
+    // 并行查询三轴频率 (DB4 字段名: hzx, hzy, hzz)
+    final futures = ['hzx', 'hzy', 'hzz'].map((param) async {
       final response = await fetchHistory(
-        pumpId: pumpId,
+        pumpId: vibId, // 使用 vibId 作为 device_id
         parameter: param,
         start: start,
         end: end,
         interval: interval,
       );
-      return MapEntry(param.split('_').last.toUpperCase(), response.data);
+      // hzx->X, hzy->Y, hzz->Z
+      final axisMap = {'hzx': 'X', 'hzy': 'Y', 'hzz': 'Z'};
+      return MapEntry(axisMap[param]!, response.data);
     });
 
     final entries = await Future.wait(futures);
@@ -505,54 +508,6 @@ class HistoryService {
     }
 
     return results;
-  }
-
-  /// 获取振动速度历史数据 (6个水泵)
-  /// interval 为 null 时自动计算最佳聚合间隔
-  Future<Map<int, List<HistoryDataPoint>>> fetchVibrationVelocityHistory({
-    required DateTime start,
-    required DateTime end,
-    String? interval,
-  }) async {
-    return fetchMultiplePumpsHistory(
-      pumpIds: [1, 2, 3, 4, 5, 6],
-      parameter: 'vibration_velocity',
-      start: start,
-      end: end,
-      interval: interval,
-    );
-  }
-
-  /// 获取振动位移历史数据 (6个水泵)
-  /// interval 为 null 时自动计算最佳聚合间隔
-  Future<Map<int, List<HistoryDataPoint>>> fetchVibrationDisplacementHistory({
-    required DateTime start,
-    required DateTime end,
-    String? interval,
-  }) async {
-    return fetchMultiplePumpsHistory(
-      pumpIds: [1, 2, 3, 4, 5, 6],
-      parameter: 'vibration_displacement',
-      start: start,
-      end: end,
-      interval: interval,
-    );
-  }
-
-  /// 获取振动频率历史数据 (6个水泵)
-  /// interval 为 null 时自动计算最佳聚合间隔
-  Future<Map<int, List<HistoryDataPoint>>> fetchVibrationFrequencyHistory({
-    required DateTime start,
-    required DateTime end,
-    String? interval,
-  }) async {
-    return fetchMultiplePumpsHistory(
-      pumpIds: [1, 2, 3, 4, 5, 6],
-      parameter: 'vibration_frequency',
-      start: start,
-      end: end,
-      interval: interval,
-    );
   }
 
   /// 释放资源 (预留接口，当前 ApiClient 为单例无需释放)

@@ -26,6 +26,12 @@ class HistoryChartCard extends StatelessWidget {
   /// 是否显示水泵选择器
   final bool showPumpSelector;
 
+  /// 水泵选择器标签 (默认 "水泵")
+  final String pumpSelectorLabel;
+
+  /// 最大水泵/传感器编号 (默认 6)
+  final int maxPumpId;
+
   /// 当前选中的水泵 (1-6)
   final int selectedPump;
 
@@ -73,6 +79,8 @@ class HistoryChartCard extends StatelessWidget {
     required this.accentColor,
     required this.yAxisLabel,
     this.showPumpSelector = true,
+    this.pumpSelectorLabel = '水泵',
+    this.maxPumpId = 6,
     required this.selectedPump,
     this.onPumpChanged,
     required this.startTime,
@@ -222,11 +230,11 @@ class HistoryChartCard extends StatelessWidget {
           style: TextStyle(color: accentColor, fontSize: 14),
           dropdownColor: TechColors.bgDark,
           icon: Icon(Icons.arrow_drop_down, color: accentColor, size: 16),
-          items: List.generate(6, (i) {
-            final pumpId = i + 1;
+          items: List.generate(maxPumpId, (i) {
+            final id = i + 1;
             return DropdownMenuItem(
-              value: pumpId,
-              child: Text('泵$pumpId', style: const TextStyle(fontSize: 14)),
+              value: id,
+              child: Text('$pumpSelectorLabel$id', style: const TextStyle(fontSize: 14)),
             );
           }),
           onChanged: (value) {

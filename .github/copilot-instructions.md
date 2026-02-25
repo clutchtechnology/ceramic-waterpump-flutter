@@ -134,13 +134,13 @@ Future<void> connect() async {
 **禁止使用 Emoji 表情符号**：
 
 ```dart
-// ✅ 正确
+//  正确
 // 1. 初始化服务
 // 注意：需要检查连接状态
 
-// ❌ 错误
-// 🚀 初始化服务
-// ⚠️ 注意：需要检查连接状态
+//  错误
+//  初始化服务
+//  注意：需要检查连接状态
 ```
 
 ### 5.3 代码设计原则
@@ -148,7 +148,7 @@ Future<void> connect() async {
 **避免过度抽象**：
 
 ```dart
-// ✅ 正确：直接简洁
+//  正确：直接简洁
 void updateDisplay(RealtimeBatchResponse data) {
   if (mounted) {
     setState(() {
@@ -157,7 +157,7 @@ void updateDisplay(RealtimeBatchResponse data) {
   }
 }
 
-// ❌ 错误：过度抽象
+//  错误：过度抽象
 String _formatVoltage(double v) => '${v.toStringAsFixed(1)} V';
 void _updateLabel(Widget label, String text) { label.text = text; }
 void updateDisplay(RealtimeBatchResponse data) {
@@ -172,7 +172,7 @@ void updateDisplay(RealtimeBatchResponse data) {
 ### 6.1 生命周期管理
 
 ```dart
-// ✅ 正确：完整的生命周期管理
+//  正确：完整的生命周期管理
 @override
 void initState() {
   super.initState();
@@ -189,7 +189,7 @@ void dispose() {
   super.dispose();
 }
 
-// ✅ 正确：检查 mounted 状态
+//  正确：检查 mounted 状态
 void _handleRealtimeData(RealtimeBatchResponse data) {
   if (mounted) {
     setState(() {
@@ -202,7 +202,7 @@ void _handleRealtimeData(RealtimeBatchResponse data) {
 ### 6.2 错误处理
 
 ```dart
-// ✅ 正确：显示用户友好的错误信息
+//  正确：显示用户友好的错误信息
 void _showError(String message) {
   if (mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -227,10 +227,10 @@ _wsService.onError = (error) {
 ### 7.1 WebSocket 连接管理
 
 ```dart
-// ✅ 正确：单例模式，全局共享连接
+//  正确：单例模式，全局共享连接
 final wsService = WebSocketService();
 
-// ✅ 正确：页面切换时不断开连接
+//  正确：页面切换时不断开连接
 @override
 void dispose() {
   // 不调用 wsService.disconnect()
@@ -241,7 +241,7 @@ void dispose() {
 ### 7.2 UI 更新优化
 
 ```dart
-// ✅ 正确：使用 ValueNotifier 减少重建
+//  正确：使用 ValueNotifier 减少重建
 final ValueNotifier<double> _voltage = ValueNotifier(0.0);
 
 @override
@@ -258,7 +258,7 @@ Widget build(BuildContext context) {
 ### 7.3 图表性能优化
 
 ```dart
-// ✅ 正确：限制数据点数量
+//  正确：限制数据点数量
 List<FlSpot> _prepareChartData(List<HistoryPoint> data) {
   if (data.length > 100) {
     final step = data.length ~/ 100;
