@@ -24,21 +24,34 @@ class _ThresholdSettingsWidgetState extends State<ThresholdSettingsWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 类别选择器
-        _buildCategorySelector(),
-        const SizedBox(height: 16),
-        // 配置内容
-        Expanded(
-          child: SingleChildScrollView(
-            child: _buildCategoryContent(),
-          ),
-        ),
-        // 底部操作按钮
-        _buildActionButtons(),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 计算可用高度
+        final availableHeight = constraints.maxHeight;
+        final categoryHeight = 40.0;
+        final actionButtonsHeight = 60.0;
+        final spacing = 32.0;
+        final contentHeight = availableHeight - categoryHeight - actionButtonsHeight - spacing;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 类别选择器
+            _buildCategorySelector(),
+            const SizedBox(height: 16),
+            // 配置内容 - 使用固定高度而不是 Expanded
+            SizedBox(
+              height: contentHeight > 0 ? contentHeight : 300,
+              child: SingleChildScrollView(
+                child: _buildCategoryContent(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // 底部操作按钮
+            _buildActionButtons(),
+          ],
+        );
+      },
     );
   }
 

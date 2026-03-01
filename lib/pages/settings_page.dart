@@ -4,6 +4,7 @@ import 'package:window_manager/window_manager.dart';
 import '../widgets/tech_line_widgets.dart';
 import '../widgets/threshold_settings_widget.dart';
 import '../providers/threshold_config_provider.dart';
+import '../api/index.dart';
 
 /// 设置页面
 /// 类似磨料车间实现 - 点击登录按钮弹窗输入密码
@@ -32,7 +33,9 @@ class _SettingsPageState extends State<SettingsPage> {
   String _operatorPassword = _defaultOperatorPassword;
 
   // 当前选中的配置区
-  int _selectedSection = 0; // 0: 系统信息, 1: 密码管理, 2: 阈值设置
+  // 0: 连接配置(服务+PLC), 1: 采集配置(轮询+InfluxDB+振动)
+  // 2: 密码管理, 3: 阈值设置
+  int _selectedSection = 0;
 
   // 密码修改控制器
   final _oldPasswordController = TextEditingController();
@@ -45,14 +48,38 @@ class _SettingsPageState extends State<SettingsPage> {
   // 阈值配置Provider
   late ThresholdConfigProvider _thresholdProvider;
 
+  // 后端服务配置 (从 /api/config/server 加载)
+  Map<String, dynamic>? _serverConfig;
+  bool _configLoading = true;
+
   @override
   void initState() {
     super.initState();
     _loadOperatorPassword();
+    _loadServerConfig();
     // 使用传入的provider或创建新实例
     _thresholdProvider = widget.thresholdProvider ?? ThresholdConfigProvider();
     if (widget.thresholdProvider == null) {
       _thresholdProvider.loadConfig();
+    }
+  }
+
+  /// 从后端加载 .env 配置
+  Future<void> _loadServerConfig() async {
+    try {
+      final resp = await ApiClient().get(Api.serverConfig);
+      if (resp != null && resp['success'] == true && mounted) {
+        setState(() {
+          _serverConfig = resp['data'] as Map<String, dynamic>;
+          _configLoading = false;
+        });
+        return;
+      }
+    } catch (e) {
+      debugPrint('[SettingsPage] 加载服务配置失败: $e');
+    }
+    if (mounted) {
+      setState(() => _configLoading = false);
     }
   }
 
@@ -367,10 +394,22 @@ class _SettingsPageState extends State<SettingsPage> {
 
   /// 左侧导航菜单
   Widget _buildNavigationMenu() {
-    final sections = [
-      {'icon': Icons.info_outline, 'label': '系统信息'},
-      {'icon': Icons.lock_outline, 'label': '密码管理'},
-      {'icon': Icons.tune, 'label': '阈值设置'},
+    // 分组导航: 运行配置 (2项) + 系统管理 (2项)
+    final menuGroups = [
+      {
+        'header': '运行配置',
+        'items': [
+          {'icon': Icons.dns, 'label': '连接配置', 'index': 0},
+          {'icon': Icons.sync, 'label': '采集配置', 'index': 1},
+        ],
+      },
+      {
+        'header': '系统管理',
+        'items': [
+          {'icon': Icons.lock_outline, 'label': '密码管理', 'index': 2},
+          {'icon': Icons.tune, 'label': '阈值设置', 'index': 3},
+        ],
+      },
     ];
 
     return Container(
@@ -381,74 +420,41 @@ class _SettingsPageState extends State<SettingsPage> {
         accentColor: TechColors.glowCyan,
         child: Column(
           children: [
-            // 菜单项列表
-            ...List.generate(sections.length, (index) {
-              final section = sections[index];
-              final isSelected = _selectedSection == index;
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () {
-                      setState(() {
-                        _selectedSection = index;
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(4),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? TechColors.glowCyan.withOpacity(0.15)
-                            : TechColors.bgMedium.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: isSelected
-                              ? TechColors.glowCyan.withOpacity(0.5)
-                              : TechColors.borderDark,
+            // 分组菜单
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final group in menuGroups) ...[
+                      // 分组标题
+                      Padding(
+                        padding:
+                            const EdgeInsets.only(left: 4, top: 4, bottom: 6),
+                        child: Text(
+                          group['header'] as String,
+                          style: TextStyle(
+                            color: TechColors.textMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            section['icon'] as IconData,
-                            size: 18,
-                            color: isSelected
-                                ? TechColors.glowCyan
-                                : TechColors.textSecondary,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              section['label'] as String,
-                              style: TextStyle(
-                                color: isSelected
-                                    ? TechColors.glowCyan
-                                    : TechColors.textPrimary,
-                                fontSize: 13,
-                                fontWeight: isSelected
-                                    ? FontWeight.w500
-                                    : FontWeight.w400,
-                              ),
-                            ),
-                          ),
-                          if (isSelected)
-                            Icon(
-                              Icons.chevron_right,
-                              size: 16,
-                              color: TechColors.glowCyan,
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
+                      // 分组项
+                      for (final item
+                          in (group['items'] as List<Map<String, dynamic>>))
+                        _buildNavItem(
+                          icon: item['icon'] as IconData,
+                          label: item['label'] as String,
+                          index: item['index'] as int,
+                        ),
+                      const SizedBox(height: 8),
+                    ],
+                  ],
                 ),
-              );
-            }),
-            // 弹性空间
-            const Spacer(),
+              ),
+            ),
             // 分隔线
             Container(
               margin: const EdgeInsets.symmetric(vertical: 12),
@@ -534,6 +540,70 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  /// 导航菜单项
+  Widget _buildNavItem({
+    required IconData icon,
+    required String label,
+    required int index,
+  }) {
+    final isSelected = _selectedSection == index;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => setState(() => _selectedSection = index),
+          borderRadius: BorderRadius.circular(4),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? TechColors.glowCyan.withOpacity(0.15)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color: isSelected
+                    ? TechColors.glowCyan.withOpacity(0.5)
+                    : Colors.transparent,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 16,
+                  color: isSelected
+                      ? TechColors.glowCyan
+                      : TechColors.textSecondary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: isSelected
+                          ? TechColors.glowCyan
+                          : TechColors.textPrimary,
+                      fontSize: 12,
+                      fontWeight:
+                          isSelected ? FontWeight.w500 : FontWeight.w400,
+                    ),
+                  ),
+                ),
+                if (isSelected)
+                  Icon(
+                    Icons.chevron_right,
+                    size: 14,
+                    color: TechColors.glowCyan,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// 退出程序确认对话框
   Future<void> _showExitConfirmDialog() async {
     final confirmed = await showDialog<bool>(
@@ -578,8 +648,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
   /// 右侧配置内容区域
   Widget _buildConfigContent() {
-    // 阈值设置需要特殊处理（使用 ThresholdSettingsWidget）
-    if (_selectedSection == 2) {
+    // 阈值设置使用 ThresholdSettingsWidget
+    if (_selectedSection == 3) {
       return Container(
         margin: const EdgeInsets.fromLTRB(0, 12, 12, 12),
         child: TechPanel(
@@ -606,10 +676,12 @@ class _SettingsPageState extends State<SettingsPage> {
   String _getSectionTitle() {
     switch (_selectedSection) {
       case 0:
-        return '系统信息';
+        return '连接配置';
       case 1:
-        return '密码管理';
+        return '采集配置';
       case 2:
+        return '密码管理';
+      case 3:
         return '阈值设置';
       default:
         return '系统设置';
@@ -617,49 +689,182 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildSectionContent() {
+    // 0-1: 运行配置加载中/失败的统一处理
+    if (_selectedSection <= 1) {
+      if (_configLoading) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(40),
+            child: CircularProgressIndicator(
+              color: TechColors.glowCyan,
+              strokeWidth: 2,
+            ),
+          ),
+        );
+      }
+      if (_serverConfig == null) {
+        return _buildConfigError();
+      }
+    }
+
     switch (_selectedSection) {
       case 0:
-        return _buildSystemInfo();
+        return _buildConnectionConfig();
       case 1:
+        return _buildCollectionConfig();
+      case 2:
         return _buildPasswordManagement();
       default:
         return const SizedBox();
     }
   }
 
-  /// 系统信息区域
-  Widget _buildSystemInfo() {
+  /// 配置加载失败时的错误提示
+  Widget _buildConfigError() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.cloud_off, color: TechColors.textMuted, size: 36),
+          const SizedBox(height: 12),
+          Text(
+            '无法加载后端配置\n请检查后端服务是否启动',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                color: TechColors.textMuted, fontSize: 13, height: 1.5),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: () {
+              setState(() => _configLoading = true);
+              _loadServerConfig();
+            },
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('重试'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: TechColors.glowCyan,
+              side: BorderSide(color: TechColors.glowCyan.withOpacity(0.5)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 只读提示条
+  Widget _buildReadonlyHint() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: TechColors.glowCyan.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: TechColors.glowCyan.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, color: TechColors.glowCyan, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '从后端 .env 读取，仅供查看，修改请编辑 .env 并重启服务',
+              style: TextStyle(color: TechColors.textSecondary, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 连接配置 (服务 + PLC)
+  Widget _buildConnectionConfig() {
+    final server = _serverConfig!['server'] as Map<String, dynamic>? ?? {};
+    final plc = _serverConfig!['plc'] as Map<String, dynamic>? ?? {};
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildReadonlyHint(),
         _buildInfoCard(
-          title: '应用信息',
-          icon: Icons.apps,
-          children: [
-            _buildInfoRow('应用名称', '水泵房监控系统', Icons.label_outline),
-            _buildInfoRow('版本', '1.0.0', Icons.tag),
-            _buildInfoRow('运行平台', 'Windows', Icons.computer),
-          ],
-        ),
-        const SizedBox(height: 16),
-        _buildInfoCard(
-          title: '后端服务',
+          title: '服务配置',
           icon: Icons.dns,
           children: [
-            _buildInfoRow('服务地址', 'localhost', Icons.router),
-            _buildInfoRow('端口', '8081', Icons.settings_ethernet),
+            _buildInfoRow(
+                'SERVER_HOST', '${server['host'] ?? '-'}', Icons.router),
+            _buildInfoRow('SERVER_PORT', '${server['port'] ?? '-'}',
+                Icons.settings_ethernet),
+            _buildInfoRow(
+                'DEBUG', '${server['debug'] ?? '-'}', Icons.bug_report),
           ],
         ),
         const SizedBox(height: 16),
         _buildInfoCard(
-          title: '密码状态',
-          icon: Icons.security,
+          title: 'PLC 配置',
+          icon: Icons.memory,
           children: [
-            _buildInfoRow('管理员密码', '****** (不可修改)', Icons.admin_panel_settings),
             _buildInfoRow(
-                '操作员密码',
-                _operatorPassword == _defaultOperatorPassword ? '默认密码' : '已修改',
-                Icons.person),
+                'PLC_IP',
+                '${plc['ip']}'.isEmpty ? '(未配置)' : '${plc['ip']}',
+                Icons.location_on),
+            _buildInfoRow('PLC_RACK', '${plc['rack'] ?? '-'}', Icons.layers),
+            _buildInfoRow('PLC_SLOT', '${plc['slot'] ?? '-'}', Icons.sd_card),
+            _buildInfoRow(
+                'PLC_TIMEOUT', '${plc['timeout'] ?? '-'} ms', Icons.timer),
+            _buildInfoRow('USE_MOCK_DATA', '${plc['use_mock_data'] ?? '-'}',
+                Icons.science),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// 采集配置 (轮询 + InfluxDB + 振动)
+  Widget _buildCollectionConfig() {
+    final polling = _serverConfig!['polling'] as Map<String, dynamic>? ?? {};
+    final influx = _serverConfig!['influxdb'] as Map<String, dynamic>? ?? {};
+    final vib = _serverConfig!['vibration'] as Map<String, dynamic>? ?? {};
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildReadonlyHint(),
+        _buildInfoCard(
+          title: '轮询配置',
+          icon: Icons.sync,
+          children: [
+            _buildInfoRow('ENABLE_POLLING',
+                '${polling['enable_polling'] ?? '-'}', Icons.play_arrow),
+            _buildInfoRow('POLL_INTERVAL_DB2',
+                '${polling['poll_interval_db2'] ?? '-'} s', Icons.speed),
+            _buildInfoRow('POLL_INTERVAL_DB1_3',
+                '${polling['poll_interval_db1_3'] ?? '-'} s', Icons.speed),
+            _buildInfoRow('POLL_INTERVAL_DB4',
+                '${polling['poll_interval_db4'] ?? '-'} s', Icons.speed),
+            _buildInfoRow('VERBOSE_LOG', '${polling['verbose_log'] ?? '-'}',
+                Icons.text_snippet),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _buildInfoCard(
+          title: 'InfluxDB 配置',
+          icon: Icons.storage,
+          children: [
+            _buildInfoRow('INFLUX_URL', '${influx['url'] ?? '-'}', Icons.link),
+            _buildInfoRow(
+                'INFLUX_ORG', '${influx['org'] ?? '-'}', Icons.business),
+            _buildInfoRow(
+                'INFLUX_BUCKET', '${influx['bucket'] ?? '-'}', Icons.folder),
+            _buildInfoRow('BATCH_SIZE', '${influx['batch_size'] ?? '-'}',
+                Icons.format_list_numbered),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _buildInfoCard(
+          title: '振动传感器',
+          icon: Icons.vibration,
+          children: [
+            _buildInfoRow(
+                'VIB_HIGH_PRECISION',
+                '${vib['high_precision'] ?? '-'}',
+                Icons.precision_manufacturing),
           ],
         ),
       ],

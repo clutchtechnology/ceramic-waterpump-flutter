@@ -49,10 +49,17 @@ class Api {
   static const String statistics = '/api/waterpump/statistics';
 
   // ============================================================
+  // 服务配置接口 (只读)
+  // ============================================================
+
+  /// 10, 获取后端运行配置 (对应 .env)
+  static const String serverConfig = '/api/config/server';
+
+  // ============================================================
   // 阈值配置接口
   // ============================================================
 
-  /// 10, 获取所有阈值配置
+  /// 11, 获取所有阈值配置
   static const String thresholds = '/api/thresholds';
 
   /// 11, 更新阈值配置
@@ -65,14 +72,14 @@ class Api {
   // 报警日志接口
   // ============================================================
 
-  /// 13, 查询最近报警记录 (新API)
-  static const String alarmsRecent = '/api/thresholds/alarms/recent';
+  /// 13, 查询报警记录
+  static const String alarmRecords = '/api/alarms/records';
 
-  /// 14, 查询报警日志 (旧API，兼容)
-  static const String alarms = '/api/waterpump/alarms';
+  /// 14, 报警统计 (各级别报警数量)
+  static const String alarmCount = '/api/alarms/count';
 
-  /// 15, 报警统计 (各类型报警数量)
-  static const String alarmsCount = '/api/waterpump/alarms/count';
+  /// 15, 获取报警阈值配置
+  static const String alarmThresholds = '/api/alarms/thresholds';
 
   // ============================================================
   // 设备状态位接口 (DB3 通信状态)

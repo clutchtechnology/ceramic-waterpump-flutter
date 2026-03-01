@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:logger/logger.dart';
 import 'package:path/path.dart' as path;
 
@@ -27,6 +28,8 @@ class AppLogger {
       // 按日期创建日志文件: app.log.2026-02-09
       _currentDate = _todayString();
       _logFile = File(path.join(_logsDir!.path, 'app.log.$_currentDate'));
+      // 新建时写入 UTF-8 BOM，使 Windows GBK 系统能正确识别 UTF-8 编码
+      _writeBomIfNew(_logFile!);
 
       _logger = Logger(
         filter: _CustomFilter(),
@@ -81,12 +84,25 @@ class AppLogger {
     return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
   }
 
+  // 6.5 新建日志文件时写入 UTF-8 BOM
+  static void _writeBomIfNew(File file) {
+    try {
+      if (!file.existsSync()) {
+        file.writeAsBytesSync([0xEF, 0xBB, 0xBF]);
+      }
+    } catch (e) {
+      print('[AppLogger] write bom failed: $e');
+    }
+  }
+
   // 7. 检查日期是否变更，如变更则切换日志文件
   static void _checkDateRotation() {
     final today = _todayString();
     if (today != _currentDate && _logsDir != null) {
       _currentDate = today;
       _logFile = File(path.join(_logsDir!.path, 'app.log.$_currentDate'));
+      // 新日期文件写入 UTF-8 BOM
+      _writeBomIfNew(_logFile!);
       _cleanOldLogs();
     }
   }
@@ -136,7 +152,8 @@ class _DailyFileOutput extends LogOutput {
       for (var line in event.lines) {
         buffer.writeln(line);
       }
-      file.writeAsStringSync(buffer.toString(), mode: FileMode.append);
+      // 强制 UTF-8 编码，避免中文系统下乱码
+      file.writeAsStringSync(buffer.toString(), mode: FileMode.append, encoding: utf8);
     } catch (e) {
       print('[AppLogger] write failed: $e');
     }

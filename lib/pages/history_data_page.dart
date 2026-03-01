@@ -8,6 +8,7 @@
 // ============================================================
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:async';
 import '../widgets/tech_line_widgets.dart';
@@ -29,6 +30,10 @@ class HistoryDataPageState extends State<HistoryDataPage> {
   // 防抖定时器
   Timer? _debounceTimer;
   static const Duration _debounceDuration = Duration(milliseconds: 500);
+
+  // [CRITICAL] 页面进入防抖：防止频繁切换 Tab 导致重复加载
+  static const Duration _refreshDebounceInterval = Duration(seconds: 10);
+  DateTime? _lastRefreshTime;
 
   // ==================== 8个图表的状态 ====================
   // 1. 功率
@@ -123,16 +128,30 @@ class HistoryDataPageState extends State<HistoryDataPage> {
 
   /// 外部调用刷新方法 (进入页面时调用)
   void refreshData() {
+    // [CRITICAL] 防抖：10秒内不重复刷新，防止频繁切换 Tab 导致重复加载
+    final now = DateTime.now();
+    final lastRefresh = _lastRefreshTime;
+    if (lastRefresh != null &&
+        now.difference(lastRefresh) < _refreshDebounceInterval) {
+      debugPrint('HistoryDataPage: 刷新防抖，跳过本次刷新');
+      return;
+    }
+    _lastRefreshTime = now;
     _refreshAllCharts();
   }
 
   /// 刷新所有图表数据
   Future<void> _refreshAllCharts() async {
+    // [CRITICAL] 并发加载所有图表，但限制并发数为 4，防止同时发起 8 个 HTTP 请求导致卡死
+    // 分 2 批加载：每批 4 个图表
     await Future.wait([
       _refreshPowerData(),
       _refreshEnergyData(),
       _refreshCurrentData(),
       _refreshVoltageData(),
+    ]);
+
+    await Future.wait([
       _refreshPressureData(),
       _refreshVelocityData(),
       _refreshDisplacementData(),
@@ -328,81 +347,145 @@ class HistoryDataPageState extends State<HistoryDataPage> {
   }
 
   // ==================== 时间选择方法 ====================
-  Future<void> _selectStartTime(String chartType) async {
+
+  /// [备用方案] 使用 Cupertino 风格的日期选择器（更稳定）
+  Future<void> _selectStartTimeCupertino(String chartType) async {
+    if (!mounted) return;
+
     final currentStart = _getStartTime(chartType);
     final accentColor = _getAccentColor(chartType);
 
-    final DateTime? pickedDate = await showDatePicker(
+    DateTime? selectedDate = currentStart;
+
+    await showModalBottomSheet(
       context: context,
-      initialDate: currentStart,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      locale: const Locale('zh', 'CN'),
-      builder: (context, child) => _buildDatePickerTheme(child, accentColor),
+      backgroundColor: TechColors.bgDark,
+      builder: (context) {
+        return Container(
+          height: 300,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('取消', style: TextStyle(color: accentColor)),
+                  ),
+                  Text('选择开始时间',
+                      style: TextStyle(color: accentColor, fontSize: 16)),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      if (mounted && selectedDate != null) {
+                        setState(() {
+                          _setStartTime(chartType, selectedDate!);
+                        });
+                        if (mounted) {
+                          _refreshChart(chartType);
+                        }
+                      }
+                    },
+                    child: Text('确定', style: TextStyle(color: accentColor)),
+                  ),
+                ],
+              ),
+              Expanded(
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.dateAndTime,
+                  initialDateTime: currentStart,
+                  minimumDate: DateTime(2020),
+                  maximumDate: DateTime.now(),
+                  use24hFormat: true,
+                  onDateTimeChanged: (DateTime newDate) {
+                    selectedDate = newDate;
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
-
-    if (pickedDate != null && mounted) {
-      // 只选择小时，不选择分钟
-      final TimeOfDay? pickedTime = await showTimePicker(
-        context: context,
-        initialTime: TimeOfDay(hour: currentStart.hour, minute: 0),
-        builder: (context, child) => _buildTimePickerTheme(child, accentColor),
-      );
-
-      if (pickedTime != null && mounted) {
-        setState(() {
-          final newStart = DateTime(
-            pickedDate.year,
-            pickedDate.month,
-            pickedDate.day,
-            pickedTime.hour,
-            0, // 分钟固定为0
-          );
-          _setStartTime(chartType, newStart);
-        });
-        _refreshChart(chartType);
-      }
-    }
   }
 
-  Future<void> _selectEndTime(String chartType) async {
+  Future<void> _selectStartTime(String chartType) async {
+    // [推荐] 直接使用 Cupertino 选择器，避免 Flutter 框架 bug
+    _selectStartTimeCupertino(chartType);
+  }
+
+  /// [备用方案] 使用 Cupertino 风格的日期选择器（更稳定）
+  Future<void> _selectEndTimeCupertino(String chartType) async {
+    if (!mounted) return;
+
     final currentEnd = _getEndTime(chartType);
     final accentColor = _getAccentColor(chartType);
 
-    final DateTime? pickedDate = await showDatePicker(
+    DateTime? selectedDate = currentEnd;
+
+    await showModalBottomSheet(
       context: context,
-      initialDate: currentEnd,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      locale: const Locale('zh', 'CN'),
-      builder: (context, child) => _buildDatePickerTheme(child, accentColor),
+      backgroundColor: TechColors.bgDark,
+      builder: (context) {
+        return Container(
+          height: 300,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('取消', style: TextStyle(color: accentColor)),
+                  ),
+                  Text('选择结束时间',
+                      style: TextStyle(color: accentColor, fontSize: 16)),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      if (mounted && selectedDate != null) {
+                        setState(() {
+                          _setEndTime(chartType, selectedDate!);
+                        });
+                        if (mounted) {
+                          _refreshChart(chartType);
+                        }
+                      }
+                    },
+                    child: Text('确定', style: TextStyle(color: accentColor)),
+                  ),
+                ],
+              ),
+              Expanded(
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.dateAndTime,
+                  initialDateTime: currentEnd,
+                  minimumDate: DateTime(2020),
+                  maximumDate: DateTime.now(),
+                  use24hFormat: true,
+                  onDateTimeChanged: (DateTime newDate) {
+                    selectedDate = newDate;
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
+  }
 
-    if (pickedDate != null && mounted) {
-      // 只选择小时，不选择分钟
-      final TimeOfDay? pickedTime = await showTimePicker(
-        context: context,
-        initialTime: TimeOfDay(hour: currentEnd.hour, minute: 0),
-        builder: (context, child) => _buildTimePickerTheme(child, accentColor),
-      );
-
-      if (pickedTime != null && mounted) {
-        setState(() {
-          final newEnd = DateTime(
-            pickedDate.year,
-            pickedDate.month,
-            pickedDate.day,
-            pickedTime.hour,
-            0, // 分钟固定为0
-          );
-          _setEndTime(chartType, newEnd);
-        });
-        _refreshChart(chartType);
-      }
-    }
+  Future<void> _selectEndTime(String chartType) async {
+    // [推荐] 直接使用 Cupertino 选择器，避免 Flutter 框架 bug
+    _selectEndTimeCupertino(chartType);
   }
 
   Widget _buildDatePickerTheme(Widget? child, Color accentColor) {
+    // [FIX] 添加空值检查
+    if (child == null) return const SizedBox.shrink();
+
     return Theme(
       data: ThemeData.dark().copyWith(
         colorScheme: ColorScheme.dark(primary: accentColor),
@@ -421,11 +504,14 @@ class HistoryDataPageState extends State<HistoryDataPage> {
           ),
         ),
       ),
-      child: child!,
+      child: child,
     );
   }
 
   Widget _buildTimePickerTheme(Widget? child, Color accentColor) {
+    // [FIX] 添加空值检查
+    if (child == null) return const SizedBox.shrink();
+
     return Theme(
       data: ThemeData.dark().copyWith(
         colorScheme: ColorScheme.dark(primary: accentColor),
@@ -444,7 +530,7 @@ class HistoryDataPageState extends State<HistoryDataPage> {
           ),
         ),
       ),
-      child: child!,
+      child: child,
     );
   }
 

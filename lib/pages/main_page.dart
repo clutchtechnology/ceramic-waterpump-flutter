@@ -11,15 +11,18 @@ import '../services/realtime_service.dart';
 import '../services/websocket_service.dart';
 import '../models/pump_data.dart';
 import '../providers/threshold_config_provider.dart';
+import '../utils/ui_watchdog.dart';
 import 'history_data_page.dart';
+import 'alarm_log_page.dart';
 import 'settings_page.dart';
 import 'sensor_status_page.dart';
 
-/// 主页面 - 带Tab导航（不含报警日志）
+/// 主页面 - 带Tab导航
 /// Tab1: 实时监控 (水泵卡片)
 /// Tab2: 历史数据 (图表)
-/// Tab3: 系统设置
-/// Tab4: 设备状态
+/// Tab3: 报警记录
+/// Tab4: 系统设置
+/// Tab5: 设备状态
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
 
@@ -63,11 +66,20 @@ class _MainPageState extends State<MainPage>
   // 9, 实时数据
   RealtimeBatchResponse? _realtimeData;
 
+  // [CRITICAL] WebSocket 节流控制：后端 0.1s 推送，UI 根据看门狗状态动态调整
+  // normal=1s, degraded=3s, critical=5s，防止工控机过载
+  DateTime? _lastWsUiUpdate;
+  Duration get _wsUiThrottle => UIWatchdog().getThrottle(
+        normal: const Duration(seconds: 1),
+        degraded: const Duration(seconds: 3),
+        critical: const Duration(seconds: 5),
+      );
+
   @override
   void initState() {
     super.initState();
-    // 1, 初始化 Tab 控制器（4个Tab：实时数据、历史数据、系统设置、设备状态）
-    _tabController = TabController(length: 4, vsync: this);
+    // 1, 初始化 Tab 控制器（5个Tab：实时数据、历史数据、报警记录、系统设置、设备状态）
+    _tabController = TabController(length: 5, vsync: this);
     _tabController.addListener(_onTabChanged);
 
     // 3, 加载阈值配置并监听变化
@@ -100,7 +112,7 @@ class _MainPageState extends State<MainPage>
     _currentTabIndex = newIndex;
 
     // 5, 离开状态页时暂停轮询
-    if (oldIndex == 3) {
+    if (oldIndex == 4) {
       _statusPageKey.currentState?.pausePolling();
     }
 
@@ -109,7 +121,7 @@ class _MainPageState extends State<MainPage>
       _historyPageKey.currentState?.refreshData();
     }
     // 5, 进入状态页面时恢复轮询
-    else if (newIndex == 3) {
+    else if (newIndex == 4) {
       _statusPageKey.currentState?.resumePolling();
     }
   }
@@ -183,9 +195,20 @@ class _MainPageState extends State<MainPage>
   /// 9, 启动实时数据轮询 (每 5 秒)
   void _startRealtimePolling() {
     _realtimeService.onDataUpdate = (data) {
-      if (mounted) {
+      if (!mounted) return;
+
+      // [CRITICAL] 无论节流与否，始终更新内部数据变量（保证数据最新）
+      _realtimeData = data;
+
+      // [CRITICAL] 节流 setState：后端 0.1s 推送，UI 最多 1s 重建一次
+      // 防止 10Hz 全量重建超复杂 Widget 树导致工控机主线程卡死
+      final now = DateTime.now();
+      final lastUiUpdate = _lastWsUiUpdate;
+      if (lastUiUpdate == null ||
+          now.difference(lastUiUpdate) >= _wsUiThrottle) {
+        _lastWsUiUpdate = now;
         setState(() {
-          _realtimeData = data;
+          // 数据已在上方更新，此处 setState 仅触发重建
         });
       }
     };
@@ -243,9 +266,11 @@ class _MainPageState extends State<MainPage>
                 _buildRealtimeContent(),
                 // Tab2: 历史数据
                 HistoryDataPage(key: _historyPageKey),
-                // Tab3: 系统设置 - 传入共享的阈值配置Provider
+                // Tab3: 报警记录
+                const AlarmLogPage(),
+                // Tab4: 系统设置 - 传入共享的阈值配置Provider
                 SettingsPage(thresholdProvider: _thresholdProvider),
-                // Tab4: 设备状态 - 合并 DB1 和 DB3
+                // Tab5: 设备状态 - 合并 DB1 和 DB3
                 SensorStatusPage(key: _statusPageKey),
               ],
             ),
@@ -329,7 +354,7 @@ class _MainPageState extends State<MainPage>
     );
   }
 
-  /// Tab切换按钮（移除报警日志）
+  /// Tab切换按钮
   Widget _buildTabButtons() {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -338,9 +363,11 @@ class _MainPageState extends State<MainPage>
         const SizedBox(width: 4),
         _buildTabButton(1, '历史数据'),
         const SizedBox(width: 4),
-        _buildTabButton(2, '系统设置'),
+        _buildTabButton(2, '报警记录'),
         const SizedBox(width: 4),
-        _buildTabButton(3, '设备状态'),
+        _buildTabButton(3, '系统设置'),
+        const SizedBox(width: 4),
+        _buildTabButton(4, '设备状态'),
       ],
     );
   }
