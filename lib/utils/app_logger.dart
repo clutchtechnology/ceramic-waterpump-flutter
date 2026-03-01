@@ -153,7 +153,8 @@ class _DailyFileOutput extends LogOutput {
         buffer.writeln(line);
       }
       // 强制 UTF-8 编码，避免中文系统下乱码
-      file.writeAsStringSync(buffer.toString(), mode: FileMode.append, encoding: utf8);
+      file.writeAsStringSync(buffer.toString(),
+          mode: FileMode.append, encoding: utf8);
     } catch (e) {
       print('[AppLogger] write failed: $e');
     }
