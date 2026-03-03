@@ -50,17 +50,16 @@ Future<void> _initializeApp() async {
 
     WindowOptions windowOptions = WindowOptions(
       size: windowSize,
-      minimumSize: const Size(640, 480),
-      center: true,
       backgroundColor: Colors.transparent,
       skipTaskbar: false,
       titleBarStyle: TitleBarStyle.hidden,
       windowButtonVisibility: false,
+      fullScreen: true,
     );
 
     await windowManager.waitUntilReadyToShow(windowOptions, () async {
-      await windowManager.setResizable(true);
       await windowManager.show();
+      await windowManager.setFullScreen(true); // 默认全屏启动
       await windowManager.focus();
     });
   }
