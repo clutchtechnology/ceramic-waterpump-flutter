@@ -312,6 +312,19 @@ class ThresholdConfigProvider extends ChangeNotifier {
   ];
 
   // ============================================================
+  // 运行功率阈值配置 (6个水泵)
+  // 功率 >= 此阈值 判定为"运行中"，否则为"停止"
+  // ============================================================
+  final List<double> runningPowerThresholds = [
+    0.5, // 1号泵运行功率阈值 (kW)
+    0.5, // 2号泵运行功率阈值 (kW)
+    0.5, // 3号泵运行功率阈值 (kW)
+    0.5, // 4号泵运行功率阈值 (kW)
+    0.5, // 5号泵运行功率阈值 (kW)
+    0.5, // 6号泵运行功率阈值 (kW)
+  ];
+
+  // ============================================================
   // 振动阈值配置 (6个水泵)
   // ============================================================
   final List<ThresholdConfig> vibrationConfigs = [
@@ -425,6 +438,18 @@ class ThresholdConfigProvider extends ChangeNotifier {
 
     // 加载频率配置
     _loadPumpConfigsFromBackend(json, 'frequency', frequencyConfigs);
+
+    // 加载运行功率阈值 (后端 key: running_power, 值为单个 float)
+    if (json['running_power'] != null) {
+      final data = json['running_power'] as Map<String, dynamic>;
+      for (int i = 0; i < runningPowerThresholds.length; i++) {
+        final pumpKey = 'pump_${i + 1}';
+        if (data[pumpKey] != null) {
+          runningPowerThresholds[i] =
+              (data[pumpKey] as num?)?.toDouble() ?? runningPowerThresholds[i];
+        }
+      }
+    }
   }
 
   /// 从后端 JSON 加载水泵参数配置的通用方法
@@ -552,6 +577,18 @@ class ThresholdConfigProvider extends ChangeNotifier {
         }
       }
     }
+
+    // 加载运行功率阈值配置
+    if (json['runningPower'] != null) {
+      final data = json['runningPower'] as Map<String, dynamic>;
+      for (int i = 0; i < runningPowerThresholds.length; i++) {
+        final key = 'pump_${i + 1}';
+        if (data[key] != null) {
+          runningPowerThresholds[i] =
+              (data[key] as num?)?.toDouble() ?? runningPowerThresholds[i];
+        }
+      }
+    }
   }
 
   Map<String, dynamic> _toJson() {
@@ -608,6 +645,10 @@ class ThresholdConfigProvider extends ChangeNotifier {
             'normalMax': config.normalMax,
             'warningMax': config.warningMax
           }
+      },
+      'runningPower': {
+        for (int i = 0; i < runningPowerThresholds.length; i++)
+          'pump_${i + 1}': runningPowerThresholds[i],
       },
     };
   }
@@ -697,6 +738,10 @@ class ThresholdConfigProvider extends ChangeNotifier {
             'normal_max': frequencyConfigs[i].normalMax,
             'warning_max': frequencyConfigs[i].warningMax,
           }
+      },
+      'running_power': {
+        for (int i = 0; i < runningPowerThresholds.length; i++)
+          'pump_${i + 1}': runningPowerThresholds[i],
       },
     };
   }
@@ -819,6 +864,10 @@ class ThresholdConfigProvider extends ChangeNotifier {
       config.normalMax = 5.0;
       config.warningMax = 10.0;
     }
+    // 重置运行功率阈值
+    for (int i = 0; i < runningPowerThresholds.length; i++) {
+      runningPowerThresholds[i] = 0.5;
+    }
     notifyListeners();
   }
 
@@ -938,5 +987,34 @@ class ThresholdConfigProvider extends ChangeNotifier {
   ThresholdConfig? getVibrationThreshold(int pumpIndex) {
     if (pumpIndex < 1 || pumpIndex > vibrationConfigs.length) return null;
     return vibrationConfigs[pumpIndex - 1];
+  }
+
+  // ============================================================
+  // 运行状态判断
+  // ============================================================
+
+  /// 判断水泵是否运行中 (泵索引 1-6)
+  /// 功率 >= 运行功率阈值 则判定为运行中
+  bool isPumpRunning(int pumpIndex, double power) {
+    if (pumpIndex < 1 || pumpIndex > runningPowerThresholds.length) {
+      return false;
+    }
+    return power >= runningPowerThresholds[pumpIndex - 1];
+  }
+
+  /// 获取运行功率阈值 (泵索引 1-6)
+  double getRunningPowerThreshold(int pumpIndex) {
+    if (pumpIndex < 1 || pumpIndex > runningPowerThresholds.length) {
+      return 0.5;
+    }
+    return runningPowerThresholds[pumpIndex - 1];
+  }
+
+  /// 更新运行功率阈值 (泵索引 0-5)
+  void updateRunningPowerThreshold(int index, double value) {
+    if (index >= 0 && index < runningPowerThresholds.length && value >= 0) {
+      runningPowerThresholds[index] = value;
+      notifyListeners();
+    }
   }
 }

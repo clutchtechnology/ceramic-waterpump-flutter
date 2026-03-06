@@ -52,6 +52,9 @@ class WebSocketService {
   // 4, WebSocket 实例
   WebSocket? _socket;
 
+  // 4a, Stream 订阅 (显式管理，防止重连时旧订阅泄漏)
+  StreamSubscription? _subscription;
+
   // 5, 当前连接状态
   WebSocketState _state = WebSocketState.disconnected;
   WebSocketState get state => _state;
@@ -76,6 +79,19 @@ class WebSocketService {
 
   // 12, 心跳间隔 (秒)
   static const int _heartbeatInterval = 15;
+
+  // 12a, 数据新鲜度监控 (Watchdog)
+  Timer? _watchdogTimer;
+  DateTime? _lastDataTime;
+  static const Duration _watchdogInterval = Duration(seconds: 5);
+  static const Duration _dataTimeout = Duration(seconds: 30);
+
+  // 12b, [CRITICAL] 消息级节流: 后端 0.1s 推送，但 fromJson 反序列化 + 模型创建开销大
+  // 每秒 10 次反序列化会产生大量临时对象，长时间运行后 GC 压力导致主线程卡死
+  // 节流到 800ms，将反序列化频率从 10次/秒 降到 ~1.25次/秒
+  DateTime _lastRealtimeProcess = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _lastDeviceStatusProcess = DateTime.fromMillisecondsSinceEpoch(0);
+  static const Duration _messageProcessThrottle = Duration(milliseconds: 800);
 
   // 13, WebSocket URL (可动态配置)
   String _wsUrl = Api.wsUrl;
@@ -135,8 +151,11 @@ class WebSocketService {
       // 18.4, 启动心跳
       _startHeartbeat();
 
-      // 18.5, 监听消息
-      _socket!.listen(
+      // 18.4a, 启动数据新鲜度监控
+      _startWatchdog();
+
+      // 18.5, 监听消息 (显式存储订阅，防止重连时旧订阅泄漏)
+      _subscription = _socket!.listen(
         _onMessage,
         onError: _onSocketError,
         onDone: _onSocketDone,
@@ -145,8 +164,7 @@ class WebSocketService {
 
       // 18.6, 发送初始订阅消息
       _sendSubscribe();
-      
-      print('[WebSocket] 连接成功: $_wsUrl');
+
       AppLogger.warning('[WebSocket] 连接成功: $_wsUrl');
     } catch (e) {
       _logError('连接失败: $e');
@@ -159,6 +177,7 @@ class WebSocketService {
   void disconnect() {
     _stopReconnectTimer();
     _stopHeartbeat();
+    _stopWatchdog();
     _closeSocket();
     _updateState(WebSocketState.disconnected);
   }
@@ -233,8 +252,34 @@ class WebSocketService {
   void _onMessage(dynamic data) {
     if (_isDisposed) return;
 
+    // 27.0, 更新数据新鲜度时间戳 (watchdog 依赖此时间戳)
+    _lastDataTime = DateTime.now();
+
     try {
-      final message = jsonDecode(data as String) as Map<String, dynamic>;
+      final raw = data as String;
+
+      // [CRITICAL] 节流前置到 jsonDecode 之前
+      // 后端 0.1s 推送 = 10msg/s, 每次 jsonDecode 创建大量临时 Map/List 对象
+      // 原方案: 10次/s jsonDecode + 1.25次/s fromJson = GC 压力来自丢弃的 jsonDecode
+      // 优化后: 仅 ~1.25次/s jsonDecode, 减少 87.5% 的临时对象分配
+      // 10h 运行: 360,000 -> 45,000 次 jsonDecode, 大幅降低 GC 停顿累积
+      if (raw.contains('"realtime_data"')) {
+        final now = DateTime.now();
+        if (now.difference(_lastRealtimeProcess) < _messageProcessThrottle) {
+          return;
+        }
+        _lastRealtimeProcess = now;
+      } else if (raw.contains('"device_status"')) {
+        final now = DateTime.now();
+        if (now.difference(_lastDeviceStatusProcess) <
+            _messageProcessThrottle) {
+          return;
+        }
+        _lastDeviceStatusProcess = now;
+      }
+
+      // heartbeat 和 error 消息频率极低，始终解析
+      final message = jsonDecode(raw) as Map<String, dynamic>;
       final type = message['type'] as String?;
 
       switch (type) {
@@ -245,14 +290,11 @@ class WebSocketService {
           _handleDeviceStatus(message);
           break;
         case WsMessageType.heartbeat:
-          // 心跳响应，无需处理
           break;
         case WsMessageType.error:
           final errorMsg = message['message'] as String? ?? '未知错误';
           onError?.call(errorMsg);
           break;
-        default:
-          _logError('未知消息类型: $type');
       }
     } catch (e) {
       _logError('消息解析失败: $e');
@@ -267,20 +309,21 @@ class WebSocketService {
         print('[WebSocket] 警告: onRealtimeDataUpdate 回调未设置！');
         return;
       }
-      
+
       // 28.2, 从 message 中提取 data 字段，构造与 HTTP 响应兼容的格式
       final response = RealtimeBatchResponse.fromJson(message);
-      
+
       // 28.3, 调用回调
       onRealtimeDataUpdate?.call(response);
     } catch (e, stackTrace) {
-      // 记录到日志文件
-      AppLogger.error('[WebSocket] 实时数据解析失败: $e', e, stackTrace);
-      
-      // 强制打印错误，不受频率控制
-      print('[WebSocket] 实时数据解析失败: $e');
-      print('[WebSocket] 消息内容: $message');
-      print('[WebSocket] 堆栈跟踪: $stackTrace');
+      // [FIX] 使用频率控制的 _logError，避免持续性解析错误时:
+      // 1. 同步文件 I/O 风暴阻塞主线程
+      // 2. print 无限输出撑爆 stdout 缓冲区
+      _logError('实时数据解析失败: $e');
+      // 仅首次记录完整堆栈到日志文件
+      if (_errorCount <= 1) {
+        AppLogger.error('[WebSocket] 实时数据解析堆栈', e, stackTrace);
+      }
     }
   }
 
@@ -288,21 +331,20 @@ class WebSocketService {
   void _handleDeviceStatus(Map<String, dynamic> message) {
     try {
       final response = DeviceStatusResponse.fromJson(message);
-      
-      // 打印设备状态更新日志
-      print('[WebSocket] 收到设备状态更新: ${response.summary?.total ?? 0} 个设备');
-      
+
       // 检查回调是否设置
       if (onDeviceStatusUpdate == null) {
         // device_status 回调未设置是正常的，不打印警告
         return;
       }
-      
+
       onDeviceStatusUpdate?.call(response);
     } catch (e, stackTrace) {
-      AppLogger.error('[WebSocket] 设备状态解析失败: $e', e, stackTrace);
+      // [FIX] 使用频率控制，避免同步 I/O 风暴
       _logError('设备状态解析失败: $e');
-      print('[WebSocket] 堆栈跟踪: $stackTrace');
+      if (_errorCount <= 1) {
+        AppLogger.error('[WebSocket] 设备状态解析堆栈', e, stackTrace);
+      }
     }
   }
 
@@ -324,6 +366,7 @@ class WebSocketService {
 
     AppLogger.warning('[WebSocket] 连接断开，准备重连');
     _stopHeartbeat();
+    _stopWatchdog();
     _closeSocket();
     _updateState(WebSocketState.disconnected);
     _scheduleReconnect();
@@ -332,6 +375,8 @@ class WebSocketService {
   /// 33, 关闭 Socket 连接
   void _closeSocket() {
     try {
+      _subscription?.cancel();
+      _subscription = null;
       _socket?.close();
     } catch (e) {
       // 忽略关闭时的错误
@@ -398,6 +443,46 @@ class WebSocketService {
     // subscribeDeviceStatus();
   }
 
+  // ============================================================
+  // 数据新鲜度监控 (Watchdog)
+  // ============================================================
+
+  /// 39a, 启动数据新鲜度监控
+  void _startWatchdog() {
+    _stopWatchdog();
+    _lastDataTime = DateTime.now();
+    _watchdogTimer = Timer.periodic(_watchdogInterval, (_) {
+      if (_isDisposed) return;
+      if (_state == WebSocketState.connected && _lastDataTime != null) {
+        final elapsed = DateTime.now().difference(_lastDataTime!);
+        if (elapsed > _dataTimeout) {
+          AppLogger.warning(
+            '[WebSocket][Watchdog] 数据停滞 ${elapsed.inSeconds}s，超过${_dataTimeout.inSeconds}s阈值，强制重连',
+          );
+          print('[WebSocket][Watchdog] 数据停滞 ${elapsed.inSeconds}s，强制重连');
+          _forceReconnect();
+        }
+      }
+    });
+  }
+
+  /// 39b, 停止数据新鲜度监控
+  void _stopWatchdog() {
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
+  }
+
+  /// 39c, 强制重连 (关闭旧连接，重置重连计数，立即重连)
+  void _forceReconnect() {
+    _stopHeartbeat();
+    _stopWatchdog();
+    _stopReconnectTimer();
+    _closeSocket();
+    _reconnectAttempts = 0;
+    _updateState(WebSocketState.disconnected);
+    connect();
+  }
+
   /// 40, 更新连接状态
   void _updateState(WebSocketState newState) {
     if (_state != newState) {
@@ -410,16 +495,13 @@ class WebSocketService {
   static int _errorCount = 0;
   void _logError(String message) {
     _errorCount++;
-    
-    // 记录到日志文件
-    AppLogger.error('[WebSocket] $_errorCount: $message');
-    
-    // 前 3 次 + 每 10 次打印到控制台
+
+    // [FIX] 频率控制同时覆盖文件写入和控制台输出
+    // 防止持续性错误导致: (1) 同步 I/O 风暴 (2) stdout 缓冲区膨胀
     if (_errorCount <= 3 || _errorCount % 10 == 0) {
-      // ignore: avoid_print
-      print('[WebSocket] $_errorCount: $message');
+      AppLogger.error('[WebSocket] $_errorCount: $message');
     }
-    
+
     onError?.call(message);
   }
 }

@@ -35,6 +35,11 @@ class HistoryDataPageState extends State<HistoryDataPage> {
   static const Duration _refreshDebounceInterval = Duration(seconds: 10);
   DateTime? _lastRefreshTime;
 
+  // [CRITICAL] 代际计数器 - 防止页面切换后旧请求的 setState 覆盖新数据
+  int _loadGeneration = 0;
+  // [CRITICAL] 加载互斥锁 - 防止多次加载重叠执行
+  bool _isLoadingInProgress = false;
+
   // ==================== 8个图表的状态 ====================
   // 1. 功率
   int _powerSelectedPump = 1;
@@ -142,21 +147,42 @@ class HistoryDataPageState extends State<HistoryDataPage> {
 
   /// 刷新所有图表数据
   Future<void> _refreshAllCharts() async {
-    // [CRITICAL] 并发加载所有图表，但限制并发数为 4，防止同时发起 8 个 HTTP 请求导致卡死
-    // 分 2 批加载：每批 4 个图表
-    await Future.wait([
-      _refreshPowerData(),
-      _refreshEnergyData(),
-      _refreshCurrentData(),
-      _refreshVoltageData(),
-    ]);
+    if (!mounted) return;
 
-    await Future.wait([
-      _refreshPressureData(),
-      _refreshVelocityData(),
-      _refreshDisplacementData(),
-      _refreshFrequencyData(),
-    ]);
+    // [CRITICAL] 如果上一批请求还在执行，递增 generation 使其丢弃结果
+    if (_isLoadingInProgress) {
+      _loadGeneration++;
+      return;
+    }
+
+    _isLoadingInProgress = true;
+    _loadGeneration++;
+    final currentGen = _loadGeneration;
+
+    try {
+      // [CRITICAL] 并发加载所有图表，限制并发数为 4，防止同时发起 8 个 HTTP 请求导致卡死
+      // 第 1 批
+      await Future.wait([
+        _refreshPowerData(),
+        _refreshEnergyData(),
+        _refreshCurrentData(),
+        _refreshVoltageData(),
+      ]);
+
+      if (!mounted || currentGen != _loadGeneration) return;
+
+      // 第 2 批
+      await Future.wait([
+        _refreshPressureData(),
+        _refreshVelocityData(),
+        _refreshDisplacementData(),
+        _refreshFrequencyData(),
+      ]);
+    } catch (e) {
+      debugPrint('HistoryDataPage: 刷新全部图表失败: $e');
+    } finally {
+      _isLoadingInProgress = false;
+    }
   }
 
   /// 转换历史数据点为FlSpot列表

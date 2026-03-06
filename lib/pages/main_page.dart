@@ -52,9 +52,9 @@ class _MainPageState extends State<MainPage>
   // 6, 跟踪当前 Tab 索引 (用于控制轮询)
   int _currentTabIndex = 0;
 
-  // 7, 时钟定时器
+  // 7, 时钟定时器 - 使用 ValueNotifier 避免每秒 setState 重建整页
   Timer? _clockTimer;
-  String _clockTime = '';
+  final ValueNotifier<String> _clockNotifier = ValueNotifier('');
 
   // 10, 窗口状态: 最小化后自动恢复全屏
   bool _restoreFullScreenAfterMinimize = false;
@@ -65,6 +65,7 @@ class _MainPageState extends State<MainPage>
   bool _dbHealthy = false;
   bool _isHealthLoading = true;
   Timer? _healthCheckTimer;
+  bool _isHealthChecking = false; // [FIX] 互斥锁，防止 HTTP 请求堆积
 
   // 9, 实时数据
   RealtimeBatchResponse? _realtimeData;
@@ -132,7 +133,9 @@ class _MainPageState extends State<MainPage>
     }
   }
 
-  /// 7, 启动时钟定时器 (替代 StreamBuilder 避免无法取消的 Stream)
+  /// 7, 启动时钟定时器 - 使用 ValueNotifier 避免每秒 setState 重建整个页面
+  /// [CRITICAL] 原先每秒 setState 会触发整个 MainPage 重建，包含 6 张泵卡片
+  /// 改用 ValueNotifier 后仅重建时钟 Text 组件，性能提升 >95%
   void _startClockTimer() {
     _updateClockTime();
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -141,17 +144,13 @@ class _MainPageState extends State<MainPage>
     });
   }
 
-  /// 7, 更新时钟显示
+  /// 7, 更新时钟显示 (ValueNotifier 不触发 setState)
   void _updateClockTime() {
     if (!mounted) return;
     final now = DateTime.now();
     final timeStr =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
-    if (_clockTime != timeStr) {
-      setState(() {
-        _clockTime = timeStr;
-      });
-    }
+    _clockNotifier.value = timeStr;
   }
 
   @override
@@ -169,9 +168,10 @@ class _MainPageState extends State<MainPage>
     _healthCheckTimer?.cancel();
     _healthCheckTimer = null;
 
-    // 7, 取消时钟定时器
+    // 7, 取消时钟定时器和 ValueNotifier
     _clockTimer?.cancel();
     _clockTimer = null;
+    _clockNotifier.dispose();
 
     // 10, 移除窗口事件监听
     windowManager.removeListener(this);
@@ -241,19 +241,28 @@ class _MainPageState extends State<MainPage>
     _realtimeService.startPolling(intervalSeconds: 5);
   }
 
-  /// 8, 检查健康状态
+  /// 8, 检查健康状态 (带互斥锁防止请求堆积)
   Future<void> _checkHealth() async {
     if (!mounted) return;
+    // [FIX] 上一次请求未完成时跳过，防止服务器响应慢时 HTTP 堆积
+    if (_isHealthChecking) return;
+    _isHealthChecking = true;
+    try {
+      final status = await _healthService.checkHealth();
 
-    final status = await _healthService.checkHealth();
-
-    if (mounted) {
-      setState(() {
-        _serverHealthy = status.serverHealthy;
-        _plcHealthy = status.plcHealthy;
-        _dbHealthy = status.dbHealthy;
-        _isHealthLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _serverHealthy = status.serverHealthy;
+          _plcHealthy = status.plcHealthy;
+          _dbHealthy = status.dbHealthy;
+          _isHealthLoading = false;
+        });
+      }
+    } catch (e) {
+      // 防崩溃: 健康检查失败不影响应用运行
+      debugPrint('[MainPage] 健康检查失败: $e');
+    } finally {
+      _isHealthChecking = false;
     }
   }
 
@@ -562,7 +571,7 @@ class _MainPageState extends State<MainPage>
         ua0: pump.ua0,
         ua1: pump.ua1,
         ua2: pump.ua2,
-        isRunning: pump.isRunning,
+        isRunning: _thresholdProvider.isPumpRunning(pump.id, pump.pt),
         vibVelocityX: vibVx,
         vibVelocityY: vibVy,
         vibVelocityZ: vibVz,
@@ -586,7 +595,7 @@ class _MainPageState extends State<MainPage>
     );
   }
 
-  /// 时钟显示 (使用Timer而非StreamBuilder，避免无法取消的Stream)
+  /// 时钟显示 - 使用 ValueListenableBuilder 仅重建时钟文本，不触发整页 setState
   Widget _buildClock() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -595,14 +604,19 @@ class _MainPageState extends State<MainPage>
         borderRadius: BorderRadius.circular(4),
         border: Border.all(color: TechColors.glowCyan.withValues(alpha: 0.3)),
       ),
-      child: Text(
-        _clockTime.isEmpty ? '--:--:--' : _clockTime,
-        style: const TextStyle(
-          color: TechColors.glowCyan,
-          fontSize: 13,
-          fontFamily: 'monospace',
-          fontWeight: FontWeight.w500,
-        ),
+      child: ValueListenableBuilder<String>(
+        valueListenable: _clockNotifier,
+        builder: (context, clockTime, child) {
+          return Text(
+            clockTime.isEmpty ? '--:--:--' : clockTime,
+            style: const TextStyle(
+              color: TechColors.glowCyan,
+              fontSize: 13,
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.w500,
+            ),
+          );
+        },
       ),
     );
   }

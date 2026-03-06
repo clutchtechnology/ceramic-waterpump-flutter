@@ -112,9 +112,7 @@ class HistoryChartCard extends StatelessWidget {
           const SizedBox(height: 4),
           // 图表主体
           Expanded(
-            child: isLoading
-                ? _buildLoadingIndicator()
-                : _buildChart(),
+            child: isLoading ? _buildLoadingIndicator() : _buildChart(),
           ),
         ],
       ),
@@ -183,7 +181,9 @@ class HistoryChartCard extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: multiLineData!.keys.map((lineName) {
-        final lineColor = multiLineColors?[lineName] ?? defaultColors[lineName] ?? accentColor;
+        final lineColor = multiLineColors?[lineName] ??
+            defaultColors[lineName] ??
+            accentColor;
         return Padding(
           padding: const EdgeInsets.only(right: 6),
           child: Row(
@@ -234,7 +234,8 @@ class HistoryChartCard extends StatelessWidget {
             final id = i + 1;
             return DropdownMenuItem(
               value: id,
-              child: Text('$pumpSelectorLabel$id', style: const TextStyle(fontSize: 14)),
+              child: Text('$pumpSelectorLabel$id',
+                  style: const TextStyle(fontSize: 14)),
             );
           }),
           onChanged: (value) {
@@ -329,7 +330,7 @@ class HistoryChartCard extends StatelessWidget {
   Widget _buildChart() {
     // 判断是单线还是多线模式
     final isMultiLine = multiLineData != null && multiLineData!.isNotEmpty;
-    
+
     if (!isMultiLine && data.isEmpty) {
       return Center(
         child: Text(
@@ -367,17 +368,31 @@ class HistoryChartCard extends StatelessWidget {
       );
     }
 
+    // [FIX] 过滤掉 NaN 和 Infinity，防止污染计算
+    allValues = allValues.where((v) => v.isFinite).toList();
+    if (allValues.isEmpty) {
+      return Center(
+        child: Text(
+          '暂无有效数据',
+          style: TextStyle(color: accentColor.withOpacity(0.4), fontSize: 12),
+        ),
+      );
+    }
+
     final minY = allValues.reduce((a, b) => a < b ? a : b);
     final maxY = allValues.reduce((a, b) => a > b ? a : b);
     final range = maxY - minY;
-    final padding = range * 0.1;
+    // [FIX] 当所有值相同时(range==0)，给一个最小范围，防止 interval 为 0
+    final effectiveRange =
+        range > 0 ? range : (minY.abs() > 0 ? minY.abs() * 0.2 : 1.0);
+    final padding = effectiveRange * 0.1;
 
     final chartMinY = (minY - padding).clamp(0.0, double.infinity);
     final chartMaxY = maxY + padding;
 
     // 构建线条数据
     List<LineChartBarData> lineBarsData = [];
-    
+
     if (isMultiLine) {
       // 多线模式
       final defaultColors = {
@@ -388,12 +403,14 @@ class HistoryChartCard extends StatelessWidget {
         'Y': const Color(0xFF0080FF), // 蓝色 - Y轴
         'Z': const Color(0xFFFFFFFF), // 白色 - Z轴
       };
-      
+
       for (final entry in multiLineData!.entries) {
         final lineName = entry.key;
         final lineData = entry.value;
-        final lineColor = multiLineColors?[lineName] ?? defaultColors[lineName] ?? accentColor;
-        
+        final lineColor = multiLineColors?[lineName] ??
+            defaultColors[lineName] ??
+            accentColor;
+
         if (lineData.isNotEmpty) {
           lineBarsData.add(
             LineChartBarData(
@@ -517,25 +534,56 @@ class HistoryChartCard extends StatelessWidget {
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 18,
-                interval: (isMultiLine 
-                  ? (multiLineData!.values.first.length > 10 
-                      ? (multiLineData!.values.first.length / 5).ceilToDouble() 
-                      : 2)
-                  : (data.length > 10 ? (data.length / 5).ceilToDouble() : 2)),
-                getTitlesWidget: (value, meta) {
-                  final maxLength = isMultiLine 
-                    ? multiLineData!.values.first.length 
-                    : data.length;
-                  if (value.toInt() >= 0 && value.toInt() < maxLength) {
-                    return Text(
-                      value.toInt().toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                      ),
-                    );
+                // 固定显示6个时间标签，均匀分布，不取整防止末尾重合
+                interval: (() {
+                  int len = 0;
+                  if (isMultiLine) {
+                    final nonEmpty =
+                        multiLineData!.values.where((l) => l.isNotEmpty);
+                    len = nonEmpty.isNotEmpty ? nonEmpty.first.length : 0;
+                  } else {
+                    len = data.length;
                   }
-                  return const SizedBox.shrink();
+                  if (len <= 1) return 1.0;
+                  // 精确浮点间隔，5段6个标签，不取整确保末尾对齐
+                  return ((len - 1) / 5.0).clamp(1.0, double.infinity);
+                })(),
+                getTitlesWidget: (value, meta) {
+                  // 获取数据总长度
+                  int maxLength = 0;
+                  if (isMultiLine) {
+                    final nonEmpty =
+                        multiLineData!.values.where((l) => l.isNotEmpty);
+                    maxLength = nonEmpty.isNotEmpty ? nonEmpty.first.length : 0;
+                  } else {
+                    maxLength = data.length;
+                  }
+                  if (maxLength <= 1) return const SizedBox.shrink();
+                  // 只在6个精确位置显示标签，过滤掉 fl_chart 多余的边界调用
+                  final step = (maxLength - 1) / 5.0;
+                  bool isValidLabel = false;
+                  for (int i = 0; i <= 5; i++) {
+                    if ((value - i * step).abs() < 0.5) {
+                      isValidLabel = true;
+                      break;
+                    }
+                  }
+                  if (!isValidLabel) return const SizedBox.shrink();
+                  final idx = value.round().clamp(0, maxLength - 1);
+                  // 根据索引在 [startTime, endTime] 之间线性插值计算时间
+                  final totalMs = endTime.difference(startTime).inMilliseconds;
+                  final ratio = idx / (maxLength - 1);
+                  final pointTime = startTime.add(
+                    Duration(milliseconds: (totalMs * ratio).round()),
+                  );
+                  final label = DateFormat('HH:mm').format(pointTime);
+                  return Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                    ),
+                  );
                 },
               ),
             ),
@@ -543,7 +591,9 @@ class HistoryChartCard extends StatelessWidget {
           gridData: FlGridData(
             show: true,
             drawVerticalLine: true,
-            horizontalInterval: (chartMaxY - chartMinY) / 5,
+            // [FIX] 确保 interval > 0，防止除零产生 Infinity
+            horizontalInterval:
+                ((chartMaxY - chartMinY) / 5).clamp(0.001, double.infinity),
             getDrawingHorizontalLine: (value) {
               return FlLine(
                 color: TechColors.borderDark.withOpacity(0.3),
@@ -561,7 +611,8 @@ class HistoryChartCard extends StatelessWidget {
             show: true,
             border: Border(
               left: BorderSide(color: accentColor.withOpacity(0.3), width: 0.5),
-              bottom: BorderSide(color: accentColor.withOpacity(0.3), width: 0.5),
+              bottom:
+                  BorderSide(color: accentColor.withOpacity(0.3), width: 0.5),
             ),
           ),
           lineTouchData: LineTouchData(
@@ -583,4 +634,3 @@ class HistoryChartCard extends StatelessWidget {
     );
   }
 }
-

@@ -1016,9 +1016,11 @@ class AlarmListItem extends StatelessWidget {
 enum AlarmLevel { info, warning, alarm }
 
 /// ============================================================================
-/// 动画网格背景 (Animated Grid Background)
+/// 静态网格背景 (Static Grid Background)
+/// [性能优化] 移除 60fps AnimationController, 改为静态绘制 + RepaintBoundary
+/// 原因: 7x24h 运行场景下, 持续 60fps 动画会导致 GPU 内存泄漏和应用卡死
 /// ============================================================================
-class AnimatedGridBackground extends StatefulWidget {
+class AnimatedGridBackground extends StatelessWidget {
   final Widget child;
   final Color gridColor;
   final double gridSize;
@@ -1031,50 +1033,28 @@ class AnimatedGridBackground extends StatefulWidget {
   });
 
   @override
-  State<AnimatedGridBackground> createState() => _AnimatedGridBackgroundState();
-}
-
-class _AnimatedGridBackgroundState extends State<AnimatedGridBackground>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 20),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // 网格背景
-        Positioned.fill(
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              return CustomPaint(
+    return RepaintBoundary(
+      child: Stack(
+        children: [
+          // 静态网格背景 - 使用 RepaintBoundary 隔离, 只绘制一次
+          Positioned.fill(
+            child: RepaintBoundary(
+              child: CustomPaint(
+                isComplex: true,
+                willChange: false,
                 painter: _GridPainter(
-                  color: widget.gridColor,
-                  gridSize: widget.gridSize,
-                  offset: _controller.value * widget.gridSize,
+                  color: gridColor,
+                  gridSize: gridSize,
+                  offset: 0,
                 ),
-              );
-            },
+              ),
+            ),
           ),
-        ),
-        // 内容
-        widget.child,
-      ],
+          // 内容
+          child,
+        ],
+      ),
     );
   }
 }
@@ -1117,142 +1097,4 @@ class _GridPainter extends CustomPainter {
   }
 }
 
-/// ============================================================================
-/// 数据流动线条 (Data Flow Line)
-/// ============================================================================
-class DataFlowLine extends StatefulWidget {
-  final double width;
-  final double height;
-  final Axis direction;
-  final Color color;
-  final Duration duration;
-
-  const DataFlowLine({
-    super.key,
-    this.width = 100,
-    this.height = 2,
-    this.direction = Axis.horizontal,
-    this.color = TechColors.glowCyan,
-    this.duration = const Duration(seconds: 2),
-  });
-
-  @override
-  State<DataFlowLine> createState() => _DataFlowLineState();
-}
-
-class _DataFlowLineState extends State<DataFlowLine>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: widget.duration,
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: widget.direction == Axis.horizontal ? widget.width : widget.height,
-      height:
-          widget.direction == Axis.horizontal ? widget.height : widget.width,
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) {
-          return CustomPaint(
-            painter: _DataFlowPainter(
-              progress: _controller.value,
-              color: widget.color,
-              isHorizontal: widget.direction == Axis.horizontal,
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _DataFlowPainter extends CustomPainter {
-  final double progress;
-  final Color color;
-  final bool isHorizontal;
-
-  _DataFlowPainter({
-    required this.progress,
-    required this.color,
-    required this.isHorizontal,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // 背景线
-    final bgPaint = Paint()
-      ..color = color.withOpacity(0.2)
-      ..strokeWidth = isHorizontal ? size.height : size.width;
-
-    if (isHorizontal) {
-      canvas.drawLine(
-        Offset(0, size.height / 2),
-        Offset(size.width, size.height / 2),
-        bgPaint,
-      );
-    } else {
-      canvas.drawLine(
-        Offset(size.width / 2, 0),
-        Offset(size.width / 2, size.height),
-        bgPaint,
-      );
-    }
-
-    // 流动光点
-    final flowPaint = Paint()
-      ..shader = LinearGradient(
-        colors: [
-          Colors.transparent,
-          color.withOpacity(0.5),
-          color,
-          color.withOpacity(0.5),
-          Colors.transparent,
-        ],
-      ).createShader(isHorizontal
-          ? Rect.fromLTWH(0, 0, size.width * 0.3, size.height)
-          : Rect.fromLTWH(0, 0, size.width, size.height * 0.3))
-      ..strokeWidth = isHorizontal ? size.height : size.width;
-
-    if (isHorizontal) {
-      final x = progress * size.width * 1.3 - size.width * 0.15;
-      canvas.save();
-      canvas.clipRect(Rect.fromLTWH(0, 0, size.width, size.height));
-      canvas.drawLine(
-        Offset(x, size.height / 2),
-        Offset(x + size.width * 0.3, size.height / 2),
-        flowPaint,
-      );
-      canvas.restore();
-    } else {
-      final y = progress * size.height * 1.3 - size.height * 0.15;
-      canvas.save();
-      canvas.clipRect(Rect.fromLTWH(0, 0, size.width, size.height));
-      canvas.drawLine(
-        Offset(size.width / 2, y),
-        Offset(size.width / 2, y + size.height * 0.3),
-        flowPaint,
-      );
-      canvas.restore();
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DataFlowPainter oldDelegate) {
-    return oldDelegate.progress != progress;
-  }
-}
+// [已删除] DataFlowLine + _DataFlowPainter: 60fps 动画死代码, 项目中未使用, 防止误用已移除

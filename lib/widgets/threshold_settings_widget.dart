@@ -20,7 +20,8 @@ class ThresholdSettingsWidget extends StatefulWidget {
 
 class _ThresholdSettingsWidgetState extends State<ThresholdSettingsWidget> {
   // 当前选中的类别
-  int _selectedCategory = 0; // 0: 电流, 1: 电压, 2: 水压, 3: 速度, 4: 位移, 5: 频率
+  int _selectedCategory =
+      0; // 0: 电流, 1: 电压, 2: 水压, 3: 速度, 4: 位移, 5: 频率, 6: 运行判断
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +32,8 @@ class _ThresholdSettingsWidgetState extends State<ThresholdSettingsWidget> {
         final categoryHeight = 40.0;
         final actionButtonsHeight = 60.0;
         final spacing = 32.0;
-        final contentHeight = availableHeight - categoryHeight - actionButtonsHeight - spacing;
+        final contentHeight =
+            availableHeight - categoryHeight - actionButtonsHeight - spacing;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -68,6 +70,11 @@ class _ThresholdSettingsWidgetState extends State<ThresholdSettingsWidget> {
       {'icon': Icons.speed, 'label': '速度阈值', 'color': TechColors.glowCyan},
       {'icon': Icons.straighten, 'label': '位移阈值', 'color': TechColors.glowCyan},
       {'icon': Icons.graphic_eq, 'label': '频率阈值', 'color': TechColors.glowCyan},
+      {
+        'icon': Icons.power_settings_new,
+        'label': '运行判断',
+        'color': TechColors.glowCyan
+      },
     ];
 
     return Container(
@@ -139,6 +146,8 @@ class _ThresholdSettingsWidgetState extends State<ThresholdSettingsWidget> {
         return _buildDisplacementConfig();
       case 5:
         return _buildFrequencyConfig();
+      case 6:
+        return _buildRunningPowerConfig();
       default:
         return const SizedBox();
     }
@@ -267,6 +276,124 @@ class _ThresholdSettingsWidgetState extends State<ThresholdSettingsWidget> {
           );
         }),
       ],
+    );
+  }
+
+  /// 运行功率阈值配置
+  /// 功率 >= 此阈值判定为"运行中"，否则为"停止"
+  Widget _buildRunningPowerConfig() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 说明信息
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: TechColors.glowCyan.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: TechColors.glowCyan.withOpacity(0.25)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, color: TechColors.glowCyan, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '当水泵功率 >= 设定阈值时判定为"运行中"，低于阈值判定为"停止"',
+                  style: TextStyle(
+                    color: TechColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        ...List.generate(6, (index) {
+          return _buildRunningPowerRow(
+            label: '${index + 1}号泵',
+            value: widget.provider.runningPowerThresholds[index],
+            onChanged: (value) {
+              setState(() {
+                widget.provider.updateRunningPowerThreshold(index, value);
+              });
+            },
+          );
+        }),
+      ],
+    );
+  }
+
+  /// 运行功率阈值配置行 (单值)
+  Widget _buildRunningPowerRow({
+    required String label,
+    required double value,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: TechColors.bgMedium.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: TechColors.borderDark),
+      ),
+      child: Row(
+        children: [
+          // 标签
+          SizedBox(
+            width: 100,
+            child: Row(
+              children: [
+                Container(
+                  width: 3,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: TechColors.glowCyan,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                        color: TechColors.textPrimary, fontSize: 16),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // 运行阈值标识
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF00ff88),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Text('运行功率阈值',
+                  style:
+                      TextStyle(color: TechColors.textSecondary, fontSize: 16)),
+            ],
+          ),
+          const SizedBox(width: 8),
+          // 输入框
+          _buildNumberInput(
+            value: value,
+            onChanged: onChanged,
+          ),
+          const SizedBox(width: 8),
+          const Text('kW',
+              style: TextStyle(color: TechColors.textSecondary, fontSize: 16)),
+        ],
+      ),
     );
   }
 
